@@ -14,10 +14,6 @@ export default function Home() {
 
       <div className="px-4 lg:px-8 xl:px-12 py-4 border-b border-gray-200 border-solid w-full leading-tight">
         <h1 className="text-md text-gray-800 font-bold">Mint protocol index</h1>
-        <p className="text-sm text-gray-600">
-          Simple ui to see the latest creations on mint protocol.
-          <a href="https://docs.mint.vv.xyz/">learn more about the protocol</a>
-        </p>
       </div>
       <TokenExplorer />
       <div className="px-4 lg:px-8 xl:px-12 py-4 border-t border-gray-200 border-solid w-full leading-tight">

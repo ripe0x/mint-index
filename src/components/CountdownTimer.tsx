@@ -2,9 +2,10 @@ import { useState, useMemo, useEffect } from "react";
 
 type Props = {
   closeAt: number;
+  totalMinted: number;
 };
 
-export const CountdownTimer = ({ closeAt }: Props) => {
+export const CountdownTimer = ({ closeAt, totalMinted }: Props) => {
   const [timeLeft, setTimeLeft] = useState({
     days: 0,
     hours: 0,
@@ -64,26 +65,27 @@ export const CountdownTimer = ({ closeAt }: Props) => {
 
   if (isExpired) {
     return (
-      <div className="text-center space-y-1">
-        <div className="text-red-500 font-medium">Mint Closed</div>
-        <div className="text-sm text-gray-500">Closed on {closeDate.full}</div>
+      <div className="flex justify-between">
+        <p className="text-sm text-gray-500">
+          {totalMinted.toLocaleString()} minted
+        </p>
+        <p className="text-sm text-gray-500 text-end">
+          Mint closed on {closeDate.full}
+        </p>
       </div>
     );
   }
 
   const timeString = `${
     timeLeft.days > 0 ? `${timeLeft.days} days, ` : ""
-  }${pad(timeLeft.hours)}h: ${pad(timeLeft.minutes)}m: ${pad(
-    timeLeft.seconds
-  )}s`;
+  }${pad(timeLeft.hours)}h ${pad(timeLeft.minutes)}m ${pad(timeLeft.seconds)}s`;
 
   return (
-    <div>
-      <p className="font-medium">Mint Closes In {timeString}</p>
-
-      {/* <p className="text-sm text-gray-500">
-        {closeDate.time} on {closeDate.date}
-      </p> */}
+    <div className="flex justify-between">
+      <p className="text-sm text-gray-500">
+        {totalMinted.toLocaleString()} minted
+      </p>
+      <p className="text-sm text-gray-500 text-end">{timeString}</p>
     </div>
   );
 };

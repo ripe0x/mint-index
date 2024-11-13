@@ -19,6 +19,7 @@ export const Token = ({ contractAddress, tokenId, deployerAddress }: Props) => {
   const [metadata, setMetadata] = useState<TokenMetadata | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const { error, handleError } = useErrorHandler();
+  const [totalMinted, setTotalMinted] = useState<number>(0);
 
   // Memoize the token identifier to prevent unnecessary re-fetches
   const tokenIdentifier = useMemo(
@@ -101,7 +102,45 @@ export const Token = ({ contractAddress, tokenId, deployerAddress }: Props) => {
     return () => {
       mounted = false;
     };
-  }, [tokenIdentifier, handleError, contractAddress, tokenId]); // Only re-run if tokenIdentifier changes
+  }, [tokenIdentifier, handleError, contractAddress, tokenId]);
+
+  // Get total minted from events
+  useEffect(() => {
+    const fetchTotalMinted = async () => {
+      if (!tokenId) return;
+
+      try {
+        const logs = await client.getLogs({
+          address: contractAddress,
+          event: {
+            type: "event",
+            name: "NewMint",
+            inputs: [
+              { type: "uint256", name: "tokenId", indexed: true },
+              { type: "uint256", name: "unitPrice", indexed: false },
+              { type: "uint256", name: "amount", indexed: false },
+              { type: "address", name: "minter", indexed: false },
+            ],
+          },
+          args: {
+            tokenId: BigInt(tokenId),
+          },
+          fromBlock: BigInt(0),
+        });
+
+        const total = logs.reduce((acc, log) => {
+          const amount = Number(log.args.amount || BigInt(0));
+          return acc + amount;
+        }, 0);
+
+        setTotalMinted(total);
+      } catch (err) {
+        console.error("Error fetching mint events:", err);
+      }
+    };
+
+    fetchTotalMinted();
+  }, [tokenId, contractAddress]);
 
   if (loading) return <div>Loading token data...</div>;
   if (error) return <div>Error loading token: {error}</div>;
@@ -118,7 +157,7 @@ export const Token = ({ contractAddress, tokenId, deployerAddress }: Props) => {
           {tokenData.name} {tokenId}
         </h3>
         <p className="text-sm text-gray-600">
-          by <DisplayName address={deployerAddress} />
+          <DisplayName address={deployerAddress} />
         </p>
         {tokenData.description && (
           <p className="text-sm text-gray-600 mt-2">{tokenData.description}</p>
@@ -133,7 +172,10 @@ export const Token = ({ contractAddress, tokenId, deployerAddress }: Props) => {
         <div className="text-sm ">
           {isMintActive ? (
             <>
-              <CountdownTimer closeAt={tokenData.mintOpenUntil} />
+              <CountdownTimer
+                closeAt={tokenData.mintOpenUntil}
+                totalMinted={totalMinted}
+              />
               <TokenMinter
                 contractAddress={contractAddress}
                 tokenId={tokenId}
@@ -141,11 +183,13 @@ export const Token = ({ contractAddress, tokenId, deployerAddress }: Props) => {
             </>
           ) : (
             <>
-              <div className="space-y-1">
-                <div className="text-red-500 font-medium">Mint Closed</div>
-                <div className="text-sm text-gray-500">
-                  Closed on {closeDate.toLocaleString()}
-                </div>
+              <div className="flex justify-between">
+                <p className="text-sm text-gray-500">
+                  {totalMinted.toLocaleString()} minted
+                </p>
+                <p className="text-sm text-gray-500 text-end">
+                  closed on {closeDate.toLocaleString()}
+                </p>
               </div>
             </>
           )}
