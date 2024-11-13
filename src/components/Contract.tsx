@@ -73,6 +73,7 @@ export const Contract = ({ contractAddress, deployerAddress }: Props) => {
             <Token
               key={`${contractAddress}-${tokenId}`}
               contractAddress={contractAddress}
+              deployerAddress={deployerAddress}
               tokenId={tokenId}
             />
           ))
