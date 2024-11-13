@@ -6,13 +6,15 @@ import { CountdownTimer } from "./CountdownTimer";
 import type { TokenData, TokenMetadata } from "../types";
 import { useErrorHandler } from "@/app/utils/errors";
 import TokenMinter from "./TokenMinter";
+import DisplayName from "./DisplayName";
 
 type Props = {
   contractAddress: Address;
   tokenId: number;
+  deployerAddress: Address;
 };
 
-export const Token = ({ contractAddress, tokenId }: Props) => {
+export const Token = ({ contractAddress, tokenId, deployerAddress }: Props) => {
   const [tokenData, setTokenData] = useState<TokenData | null>(null);
   const [metadata, setMetadata] = useState<TokenMetadata | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
@@ -110,28 +112,44 @@ export const Token = ({ contractAddress, tokenId }: Props) => {
   const closeDate = new Date(tokenData.mintOpenUntil * 1000);
 
   return (
-    <div className="rounded mb-4">
-      <h3 className="font-bold text-lg">{tokenData.name}</h3>
-      {metadata?.image && <img src={metadata.image} alt={tokenData.name} />}
-      <div className="text-sm space-y-1">
-        <p>Token ID: {tokenId}</p>
-        <p>Block Created: {tokenData.mintedBlock}</p>
-
-        {isMintActive ? (
-          <>
-            <CountdownTimer closeAt={tokenData.mintOpenUntil} />
-            <TokenMinter contractAddress={contractAddress} tokenId={tokenId} />
-          </>
-        ) : (
-          <>
-            <div className="space-y-1">
-              <div className="text-red-500 font-medium">Mint Closed</div>
-              <div className="text-sm text-gray-500">
-                Closed on {closeDate.toLocaleString()}
-              </div>
-            </div>
-          </>
+    <div className="rounded shadow-lg">
+      <div className="p-4">
+        <h3 className="font-bold text-xl text-gray-800">
+          {tokenData.name} {tokenId}
+        </h3>
+        <p className="text-sm text-gray-600">
+          by <DisplayName address={deployerAddress} />
+        </p>
+        {tokenData.description && (
+          <p className="text-sm text-gray-600 mt-2">{tokenData.description}</p>
         )}
+      </div>
+      <div className="my-2 w-full">
+        {metadata?.image && (
+          <img src={metadata.image} alt={tokenData.name} className="w-full" />
+        )}
+      </div>
+      <div className="p-4">
+        <div className="text-sm ">
+          {isMintActive ? (
+            <>
+              <CountdownTimer closeAt={tokenData.mintOpenUntil} />
+              <TokenMinter
+                contractAddress={contractAddress}
+                tokenId={tokenId}
+              />
+            </>
+          ) : (
+            <>
+              <div className="space-y-1">
+                <div className="text-red-500 font-medium">Mint Closed</div>
+                <div className="text-sm text-gray-500">
+                  Closed on {closeDate.toLocaleString()}
+                </div>
+              </div>
+            </>
+          )}
+        </div>
       </div>
     </div>
   );

@@ -5,6 +5,7 @@ import { RainbowKitProvider, getDefaultConfig } from "@rainbow-me/rainbowkit";
 import { mainnet } from "viem/chains";
 import { WagmiProvider } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { Inter } from "next/font/google";
 
 const config = getDefaultConfig({
   appName: "My RainbowKit App",
@@ -14,13 +15,21 @@ const config = getDefaultConfig({
 });
 
 const queryClient = new QueryClient();
+const inter = Inter({ subsets: ["latin"] });
 
 export default function MyApp({ Component, pageProps }: AppProps) {
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider>
-          <Component {...pageProps} />
+          <main
+            className={
+              `flex flex-col gap-8 row-start-2 items-center sm:items-start ` +
+              inter.className
+            }
+          >
+            <Component {...pageProps} />
+          </main>
         </RainbowKitProvider>
       </QueryClientProvider>
     </WagmiProvider>

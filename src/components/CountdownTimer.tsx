@@ -81,9 +81,9 @@ export const CountdownTimer = ({ closeAt }: Props) => {
     <div>
       <p className="font-medium">Mint Closes In {timeString}</p>
 
-      <p className="text-sm text-gray-500">
+      {/* <p className="text-sm text-gray-500">
         {closeDate.time} on {closeDate.date}
-      </p>
+      </p> */}
     </div>
   );
 };
