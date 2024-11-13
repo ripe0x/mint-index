@@ -26,7 +26,7 @@ const ContractExplorer = () => {
           blockNumber: Number(log.blockNumber),
         }));
 
-        setContracts(contractCreations);
+        setContracts(contractCreations.reverse());
 
         setLoading(false);
       } catch (err) {
