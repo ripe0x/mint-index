@@ -1,10 +1,5 @@
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { config } from "@/config";
-import { WagmiProvider } from "wagmi";
 import ContractExplorer from "@/components/ContractExplorer";
 import Head from "next/head";
-
-const queryClient = new QueryClient();
 
 export default function Home() {
   return (

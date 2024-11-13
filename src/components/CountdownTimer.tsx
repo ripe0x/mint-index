@@ -80,26 +80,7 @@ export const CountdownTimer = ({ closeAt }: Props) => {
   return (
     <div>
       <p className="font-medium">Mint Closes In {timeString}</p>
-      {/* <div className="flex justify-center gap-2 text-lg">
-        {timeLeft.days > 0 && (
-          <div className="flex flex-col items-center">
-            <span className="font-mono font-bold">{timeLeft.days}</span>
-            <span className="text-xs text-gray-500">days</span>
-          </div>
-        )}
-        <div className="flex flex-col items-center">
-          <span className="font-mono font-bold">{pad(timeLeft.hours)}</span>
-          <span className="text-xs text-gray-500">hrs</span>
-        </div>
-        <div className="flex flex-col items-center">
-          <span className="font-mono font-bold">{pad(timeLeft.minutes)}</span>
-          <span className="text-xs text-gray-500">min</span>
-        </div>
-        <div className="flex flex-col items-center">
-          <span className="font-mono font-bold">{pad(timeLeft.seconds)}</span>
-          <span className="text-xs text-gray-500">sec</span>
-        </div>
-      </div> */}
+
       <p className="text-sm text-gray-500">
         {closeDate.time} on {closeDate.date}
       </p>

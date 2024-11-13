@@ -5,22 +5,32 @@ import {
   useReadContract,
   useWatchContractEvent,
   useTransaction,
+  useBlock,
 } from "wagmi";
-import { parseEther, formatEther, type Hash } from "viem";
+import { formatEther, type Hash } from "viem";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { abi1155 } from "@/abi/abi1155";
 
 interface MinterProps {
   contractAddress: `0x${string}`;
-  tokenId: string;
+  tokenId: number;
 }
 
 const contractAbi = abi1155; // Your provided ABI goes here
+
+const formatETH = (value: bigint) => {
+  return Number(formatEther(value)).toFixed(5);
+};
 
 export default function TokenMinter({ contractAddress, tokenId }: MinterProps) {
   const [amount, setAmount] = useState<string>("1");
   const [txHash, setTxHash] = useState<Hash>();
   const { isConnected } = useAccount();
+  const block = useBlock({
+    watch: true,
+  });
+  const baseFee =
+    (block.data?.baseFeePerGas ?? BigInt(0)) * BigInt(60000) || BigInt(0);
 
   // Read token info and price
   const { data: tokenInfo } = useReadContract({
@@ -34,8 +44,7 @@ export default function TokenMinter({ contractAddress, tokenId }: MinterProps) {
   });
 
   // Calculate total mint price (price per token * amount)
-  const mintPrice = tokenInfo ? (tokenInfo[6] as bigint) : BigInt(0); // Assuming data[6] contains the price
-  const totalPrice = mintPrice * BigInt(amount || "1");
+  const totalPrice = baseFee * BigInt(amount || "1");
 
   // Write interaction for minting
   const {
@@ -81,7 +90,7 @@ export default function TokenMinter({ contractAddress, tokenId }: MinterProps) {
 
   return (
     <div className="max-w-md mx-auto p-6 bg-white rounded-lg shadow-lg">
-      <h1 className="text-2xl font-bold mb-6">ERC-1155 Token Minter</h1>
+      <h1 className="font-bold text-xl">Mint</h1>
 
       {!isConnected ? (
         <div className="mb-6">
@@ -89,19 +98,6 @@ export default function TokenMinter({ contractAddress, tokenId }: MinterProps) {
         </div>
       ) : (
         <div className="space-y-4">
-          {/* <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Token ID
-            </label>
-            <input
-              type="number"
-              value={tokenId}
-              onChange={(e) => setTokenId(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
-              min="0"
-            />
-          </div> */}
-
           <div>
             <label className="block text-sm font-medium text-gray-700 mb-1">
               Amount
@@ -116,13 +112,10 @@ export default function TokenMinter({ contractAddress, tokenId }: MinterProps) {
           </div>
 
           {tokenInfo && (
-            <div className="p-4 bg-gray-50 rounded-md space-y-2">
-              <h3 className="font-medium">Token Info:</h3>
-              <p>Name: {tokenInfo[0]}</p>
-              <p>Description: {tokenInfo[1]}</p>
-              <p>Price per token: {formatEther(mintPrice)} ETH</p>
+            <div className="p-4 bg-gray-50 rounded-md ">
+              <p>Price per token: {formatETH(baseFee)} ETH</p>
               <p className="font-medium">
-                Total price: {formatEther(totalPrice)} ETH
+                Total price: {formatETH(totalPrice)} ETH
               </p>
             </div>
           )}
@@ -134,7 +127,7 @@ export default function TokenMinter({ contractAddress, tokenId }: MinterProps) {
           >
             {isMinting || isWaitingTx
               ? "Processing..."
-              : `Mint Tokens (${formatEther(totalPrice)} ETH)`}
+              : `Mint Tokens (${formatETH(totalPrice)} ETH)`}
           </button>
 
           {mintError && (

@@ -6,6 +6,7 @@ import { CountdownTimer } from "./CountdownTimer";
 import type { TokenData, TokenMetadata } from "../types";
 import { useErrorHandler } from "@/app/utils/errors";
 import TokenMinter from "./TokenMinter";
+import Image from "next/image";
 
 type Props = {
   contractAddress: Address;
@@ -99,7 +100,7 @@ export const Token = ({ contractAddress, tokenId }: Props) => {
     return () => {
       mounted = false;
     };
-  }, [tokenIdentifier, handleError]); // Only re-run if tokenIdentifier changes
+  }, [tokenIdentifier, handleError, contractAddress, tokenId]); // Only re-run if tokenIdentifier changes
 
   if (loading) return <div>Loading token data...</div>;
   if (error) return <div>Error loading token: {error}</div>;
@@ -107,12 +108,13 @@ export const Token = ({ contractAddress, tokenId }: Props) => {
 
   const now = Math.floor(Date.now() / 1000);
   const isMintActive = tokenData.mintOpenUntil > now;
+  const closeDate = new Date(tokenData.mintOpenUntil * 1000);
 
   return (
     <div className="rounded mb-4">
       <h3 className="font-bold text-lg">{tokenData.name}</h3>
       {metadata?.image && (
-        <img
+        <Image
           src={metadata.image}
           alt={tokenData.name}
           className="w-full h-48 object-cover rounded my-2"
@@ -122,8 +124,21 @@ export const Token = ({ contractAddress, tokenId }: Props) => {
         <p>Token ID: {tokenId}</p>
         <p>Block Created: {tokenData.mintedBlock}</p>
 
-        {isMintActive && <CountdownTimer closeAt={tokenData.mintOpenUntil} />}
-        <TokenMinter contractAddress={contractAddress} tokenId={tokenId} />
+        {isMintActive ? (
+          <>
+            <CountdownTimer closeAt={tokenData.mintOpenUntil} />
+            <TokenMinter contractAddress={contractAddress} tokenId={tokenId} />
+          </>
+        ) : (
+          <>
+            <div className="space-y-1">
+              <div className="text-red-500 font-medium">Mint Closed</div>
+              <div className="text-sm text-gray-500">
+                Closed on {closeDate.toLocaleString()}
+              </div>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
