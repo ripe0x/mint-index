@@ -6,7 +6,6 @@ import { CountdownTimer } from "./CountdownTimer";
 import type { TokenData, TokenMetadata } from "../types";
 import { useErrorHandler } from "@/app/utils/errors";
 import TokenMinter from "./TokenMinter";
-import Image from "next/image";
 
 type Props = {
   contractAddress: Address;
@@ -113,13 +112,7 @@ export const Token = ({ contractAddress, tokenId }: Props) => {
   return (
     <div className="rounded mb-4">
       <h3 className="font-bold text-lg">{tokenData.name}</h3>
-      {metadata?.image && (
-        <Image
-          src={metadata.image}
-          alt={tokenData.name}
-          className="w-full h-48 object-cover rounded my-2"
-        />
-      )}
+      {metadata?.image && <img src={metadata.image} alt={tokenData.name} />}
       <div className="text-sm space-y-1">
         <p>Token ID: {tokenId}</p>
         <p>Block Created: {tokenData.mintedBlock}</p>

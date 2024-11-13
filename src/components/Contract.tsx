@@ -57,7 +57,7 @@ export const Contract = ({ contractAddress, deployerAddress }: Props) => {
   return (
     <div className="mb-8">
       <h2 className="text-xl font-bold">
-        Contract: {contractAddress}
+        Contract: <DisplayName address={contractAddress} />
         <span className="text-sm font-normal ml-2">
           ({tokenIds.length} tokens)
         </span>
@@ -78,6 +78,7 @@ export const Contract = ({ contractAddress, deployerAddress }: Props) => {
           ))
         )}
       </div>
+      <hr className="h-px my-8 bg-gray-200 border-0 dark:bg-gray-700" />
     </div>
   );
 };
