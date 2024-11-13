@@ -1,4 +1,4 @@
-import React, { use, useEffect, useState } from "react";
+import React, { useEffect, useState } from "react";
 import { fetchFactoryEvents } from "@/lib/fetchFactoryEvents";
 import { Address } from "viem";
 import { Contract } from "./Contract";
@@ -35,7 +35,7 @@ const ContractExplorer = () => {
     }
 
     getEvents();
-  }, []);
+  }, [handleError]);
 
   if (loading) {
     return <div>Loading...</div>;

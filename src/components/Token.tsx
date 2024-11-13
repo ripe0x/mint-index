@@ -5,6 +5,7 @@ import { client } from "@/config";
 import { CountdownTimer } from "./CountdownTimer";
 import type { TokenData, TokenMetadata } from "../types";
 import { useErrorHandler } from "@/app/utils/errors";
+import TokenMinter from "./TokenMinter";
 
 type Props = {
   contractAddress: Address;
@@ -98,7 +99,7 @@ export const Token = ({ contractAddress, tokenId }: Props) => {
     return () => {
       mounted = false;
     };
-  }, [tokenIdentifier]); // Only re-run if tokenIdentifier changes
+  }, [tokenIdentifier, handleError]); // Only re-run if tokenIdentifier changes
 
   if (loading) return <div>Loading token data...</div>;
   if (error) return <div>Error loading token: {error}</div>;
@@ -122,6 +123,7 @@ export const Token = ({ contractAddress, tokenId }: Props) => {
         <p>Block Created: {tokenData.mintedBlock}</p>
 
         {isMintActive && <CountdownTimer closeAt={tokenData.mintOpenUntil} />}
+        <TokenMinter contractAddress={contractAddress} tokenId={tokenId} />
       </div>
     </div>
   );

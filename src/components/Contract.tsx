@@ -47,7 +47,7 @@ export const Contract = ({ contractAddress, deployerAddress }: Props) => {
     return () => {
       mounted = false;
     };
-  }, [memoizedAddress]);
+  }, [memoizedAddress, handleError]);
 
   if (loading) return <div>Loading contract data...</div>;
   if (error) return <div>Error loading contract: {error}</div>;
