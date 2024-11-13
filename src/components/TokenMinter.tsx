@@ -10,7 +10,7 @@ import {
 import { formatEther, type Hash } from "viem";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { abi1155 } from "@/abi/abi1155";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown } from "lucide-react";
 
 interface MinterProps {
   contractAddress: `0x${string}`;
