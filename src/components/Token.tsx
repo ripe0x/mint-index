@@ -153,9 +153,7 @@ export const Token = ({ contractAddress, tokenId, deployerAddress }: Props) => {
   return (
     <div className="rounded shadow-lg">
       <div className="p-4">
-        <h3 className="font-bold text-xl text-gray-800">
-          {tokenData.name} {tokenId}
-        </h3>
+        <h3 className="font-bold text-xl text-gray-800">{tokenData.name}</h3>
         <p className="text-sm text-gray-600">
           <DisplayName address={deployerAddress} />
         </p>
