@@ -164,6 +164,51 @@ export const Token = ({ contractAddress, tokenId, deployerAddress }: Props) => {
   const isMintActive = tokenData.mintOpenUntil > now;
   const closeDate = new Date(tokenData.mintOpenUntil * 1000);
 
+  const getDisplayContent = (
+    metadata: TokenMetadata | null,
+    tokenData: TokenData
+  ) => {
+    if (
+      metadata?.animation_url &&
+      (metadata.animation_url.includes("html") ||
+        metadata.animation_url.includes("htm"))
+    ) {
+      return (
+        <iframe
+          src={metadata.animation_url}
+          className="w-full h-full"
+          frameBorder="0"
+          title={tokenData.name}
+        />
+      );
+    }
+    if (
+      metadata?.animation_url &&
+      (metadata.animation_url.includes("mp4") ||
+        metadata.animation_url.includes("webm"))
+    ) {
+      return (
+        <video
+          src={metadata.animation_url}
+          autoPlay
+          loop
+          muted
+          className="w-full"
+        />
+      );
+    }
+
+    if (metadata?.image) {
+      return (
+        <img src={metadata.image} alt={tokenData.name} className="w-full" />
+      );
+    }
+
+    return null;
+  };
+
+  const displayContent = getDisplayContent(metadata, tokenData);
+
   return (
     <a
       href={`${EXTERNAL_MINT_BASE_URL}/${deployerAddress}/${contractAddress}/${tokenId}`}
@@ -177,11 +222,7 @@ export const Token = ({ contractAddress, tokenId, deployerAddress }: Props) => {
           <DisplayName address={deployerAddress} />
         </p>
       </div>
-      <div className="w-full">
-        {metadata?.image && (
-          <img src={metadata.image} alt={tokenData.name} className="w-full" />
-        )}
-      </div>
+      <div className="w-full aspect-square">{displayContent}</div>
       <div className="p-4">
         <div className="text-[12px]">
           {isMintActive ? (
