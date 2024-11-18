@@ -198,7 +198,7 @@ export const Token = ({ contractAddress, tokenId, deployerAddress }: Props) => {
                   {totalMinted.toLocaleString()} minted
                 </p>
                 <p className="text-[12px] opacity-60 text-end">
-                  closed on {closeDate.toLocaleString()}
+                  closed on {closeDate.toLocaleDateString()}
                 </p>
               </div>
             </>

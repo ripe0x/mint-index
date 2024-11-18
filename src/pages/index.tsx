@@ -5,10 +5,10 @@ export default function Home() {
   return (
     <>
       <Head>
-        <title>networked nodes</title>
+        <title>NetworkedNodes.art</title>
         <meta
           name="description"
-          content="Explore the latest contract creations on mint protocol"
+          content="explore the latest creations on mint protocol"
         />
         <link rel="icon" href="/favicon.svg" />
       </Head>
