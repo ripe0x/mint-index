@@ -22,12 +22,7 @@ export default function MyApp({ Component, pageProps }: AppProps) {
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider>
-          <main
-            className={
-              `flex flex-col gap-8 row-start-2 items-center sm:items-start ` +
-              inter.className
-            }
-          >
+          <main className={inter.className}>
             <Component {...pageProps} />
           </main>
         </RainbowKitProvider>

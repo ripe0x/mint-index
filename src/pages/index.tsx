@@ -11,34 +11,37 @@ export default function Home() {
           content="Explore the latest contract creations on mint protocol"
         />
       </Head>
-
-      <div className="px-4 lg:px-8 xl:px-12 py-4 border-b border-gray-200 border-solid w-full leading-tight">
-        <h1 className="text-md text-gray-800 font-bold">Mint protocol index</h1>
-      </div>
-      <TokenExplorer />
-      <div className="px-4 lg:px-8 xl:px-12 py-4 border-t border-gray-200 border-solid w-full leading-tight">
-        <p className="text-sm text-gray-600">
-          this website is a simple ui to see the latest creations on{" "}
-          <a
-            href="https://docs.mint.vv.xyz/"
-            target="_blank"
-            rel="noreferrer"
-            className="font-bold underline hover:no-underline"
-          >
-            mint protocol
-          </a>
-        </p>
-        <p className="text-sm text-gray-600">
-          created by{" "}
-          <a
-            href="https://twitter.com/ripe0x"
-            target="_blank"
-            rel="noreferrer"
-            className="font-bold underline hover:no-underline"
-          >
-            ripe
-          </a>
-        </p>
+      <div className="flex flex-col row-start-2 items-center sm:items-start">
+        <div className="px-4 lg:px-8 xl:px-12 py-4 2xl:py-8 w-full leading-tight">
+          <h1 className="text-md text-gray-800 font-bold">
+            Mint protocol index
+          </h1>
+        </div>
+        <TokenExplorer />
+        <div className="px-4 lg:px-8 xl:px-12 py-4 border-t border-gray-200 border-solid w-full leading-tight">
+          <p className="text-sm text-gray-600">
+            this website is a simple ui to see the latest creations on{" "}
+            <a
+              href="https://docs.mint.vv.xyz/"
+              target="_blank"
+              rel="noreferrer"
+              className="font-bold underline hover:no-underline"
+            >
+              mint protocol
+            </a>
+          </p>
+          <p className="text-sm text-gray-600">
+            created by{" "}
+            <a
+              href="https://twitter.com/ripe0x"
+              target="_blank"
+              rel="noreferrer"
+              className="font-bold underline hover:no-underline"
+            >
+              ripe
+            </a>
+          </p>
+        </div>
       </div>
     </>
   );
