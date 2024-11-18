@@ -10,6 +10,7 @@ export default function Home() {
           name="description"
           content="Explore the latest contract creations on mint protocol"
         />
+        <link rel="icon" href="/favicon.svg" />
       </Head>
       <div className="flex flex-col row-start-2 items-center sm:items-start">
         <div className="px-4 lg:px-8 xl:px-12 py-4 2xl:py-8 w-full leading-tight">

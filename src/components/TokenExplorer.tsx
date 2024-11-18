@@ -105,22 +105,25 @@ const TokenExplorer = () => {
 
   if (loading)
     return (
-      <div className="px-4 lg:px-8 xl:px-12 py-4 text-gray-600">
+      <div className="px-4 lg:px-8 text-xs xl:px-12 py-4 opacity-60 w-full">
         Loading all tokens...
       </div>
     );
   if (error)
     return (
-      <div className="px-4 lg:px-8 xl:px-12 py-4 text-gray-600">
+      <div className="px-4 lg:px-8 text-xs xl:px-12 py-4 opacity-60 w-full">
         Error: {error}
       </div>
     );
 
   return (
-    <div className="px-4 lg:px-8 xl:px-12 py-0">
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 lg:gap-8 xl:gap-16">
+    <div className="px-4 lg:px-8 xl:px-12 py-0 w-full">
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 lg:gap-8 xl:gap-16 w-full">
         {tokens.map((token) => (
-          <div key={`${token.contractAddress}-${token.tokenId}`}>
+          <div
+            key={`${token.contractAddress}-${token.tokenId}`}
+            className="w-full min-h-60"
+          >
             <Token
               contractAddress={token.contractAddress}
               tokenId={token.tokenId}

@@ -25,7 +25,8 @@ const DisplayName = (props: Props) => {
         {result.isLoading ? (
           <span>{concatAddr(props.address)}</span>
         ) : result.error ? (
-          <span>Error: {result.error.message}</span>
+          // <span>Error: {result.error.message}</span>
+          <span>{concatAddr(props.address)}</span>
         ) : result.data ? (
           <span>{result.data}</span>
         ) : (

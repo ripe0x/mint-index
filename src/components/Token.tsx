@@ -142,8 +142,22 @@ export const Token = ({ contractAddress, tokenId, deployerAddress }: Props) => {
     fetchTotalMinted();
   }, [tokenId, contractAddress]);
 
-  if (loading) return <div>Loading token data...</div>;
-  if (error) return <div>Error loading token: {error}</div>;
+  if (loading)
+    return (
+      <div className="bg-white group flex flex-col items-center justify-center min-h-60">
+        <div className="p-3 text-center text-[12px] font-light opacity-60">
+          Loading token data...
+        </div>
+      </div>
+    );
+  if (error)
+    return (
+      <div className="bg-white group flex flex-col items-center justify-center min-h-60">
+        <div className="p-3 text-center text-[12px] font-light opacity-60">
+          Error loading token: {error}
+        </div>
+      </div>
+    );
   if (!tokenData) return null;
 
   const now = Math.floor(Date.now() / 1000);
@@ -155,57 +169,50 @@ export const Token = ({ contractAddress, tokenId, deployerAddress }: Props) => {
       href={`${EXTERNAL_MINT_BASE_URL}/${deployerAddress}/${contractAddress}/${tokenId}`}
       target="_blank"
       rel="noreferrer"
-      className="bg-white group hover:shadow-xl transition duration-300 ease-in-out flex flex-col"
+      className="bg-white group hover:shadow-xl relative hover:-mt-1 hover:pb-1 transition-all duration-150 ease-in-out flex flex-col"
     >
-      <div className="">
-        <div className="p-3">
-          <h3 className="text-sm font-bold opacity-75">{tokenData.name}</h3>
-          <p className="text-[14px] opacity-60 font-thin">
-            <DisplayName address={deployerAddress} />
-          </p>
-          {/* {tokenData.description && (
-            <p className="text-sm text-gray-600 mt-2">
-              {tokenData.description}
-            </p>
-          )} */}
-        </div>
-        <div className="w-full">
-          {metadata?.image && (
-            <img src={metadata.image} alt={tokenData.name} className="w-full" />
-          )}
-        </div>
-        <div className="p-4">
-          <div className="text-[12px]">
-            {isMintActive ? (
-              <>
-                <CountdownTimer
-                  closeAt={tokenData.mintOpenUntil}
-                  totalMinted={totalMinted}
-                />
-              </>
-            ) : (
-              <>
-                <div className="flex justify-between">
-                  <p className="text-[12px] opacity-60">
-                    {totalMinted.toLocaleString()} minted
-                  </p>
-                  <p className="text-[12px] opacity-60 text-end">
-                    closed on {closeDate.toLocaleString()}
-                  </p>
-                </div>
-              </>
-            )}
-          </div>
-
-          {tokenData.description && (
+      <div className="p-3">
+        <h3 className="text-sm font-bold opacity-75">{tokenData.name}</h3>
+        <p className="text-[14px] opacity-60 font-thin">
+          <DisplayName address={deployerAddress} />
+        </p>
+      </div>
+      <div className="w-full">
+        {metadata?.image && (
+          <img src={metadata.image} alt={tokenData.name} className="w-full" />
+        )}
+      </div>
+      <div className="p-4">
+        <div className="text-[12px]">
+          {isMintActive ? (
             <>
-              <hr className="my-2" />
-              <p className="text-[12px] font-thin opacity-75 mt-2">
-                {tokenData.description}
-              </p>
+              <CountdownTimer
+                closeAt={tokenData.mintOpenUntil}
+                totalMinted={totalMinted}
+              />
+            </>
+          ) : (
+            <>
+              <div className="flex justify-between">
+                <p className="text-[12px] opacity-60">
+                  {totalMinted.toLocaleString()} minted
+                </p>
+                <p className="text-[12px] opacity-60 text-end">
+                  closed on {closeDate.toLocaleString()}
+                </p>
+              </div>
             </>
           )}
         </div>
+
+        {tokenData.description && (
+          <>
+            <hr className="my-2" />
+            <p className="text-[12px] font-thin opacity-75 mt-2">
+              {tokenData.description}
+            </p>
+          </>
+        )}
       </div>
     </a>
   );
