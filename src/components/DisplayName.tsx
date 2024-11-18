@@ -16,23 +16,15 @@ const DisplayName = (props: Props) => {
 
   return (
     <>
-      {/* link to etherscan address */}
-      <a
-        href={`https://etherscan.io/address/${props.address}`}
-        target="_blank"
-        rel="noreferrer"
-      >
-        {result.isLoading ? (
-          <span>{concatAddr(props.address)}</span>
-        ) : result.error ? (
-          // <span>Error: {result.error.message}</span>
-          <span>{concatAddr(props.address)}</span>
-        ) : result.data ? (
-          <span>{result.data}</span>
-        ) : (
-          <span>{concatAddr(props.address)}</span>
-        )}
-      </a>
+      {result.isLoading ? (
+        <span>{concatAddr(props.address)}</span>
+      ) : result.error ? (
+        <span>{concatAddr(props.address)}</span>
+      ) : result.data ? (
+        <span>{result.data}</span>
+      ) : (
+        <span>{concatAddr(props.address)}</span>
+      )}
     </>
   );
 };
