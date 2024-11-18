@@ -5,7 +5,7 @@ import { RainbowKitProvider, getDefaultConfig } from "@rainbow-me/rainbowkit";
 import { mainnet } from "viem/chains";
 import { WagmiProvider } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { Inter } from "next/font/google";
+import { IBM_Plex_Mono } from "next/font/google";
 
 const config = getDefaultConfig({
   appName: "My RainbowKit App",
@@ -15,14 +15,17 @@ const config = getDefaultConfig({
 });
 
 const queryClient = new QueryClient();
-const inter = Inter({ subsets: ["latin"] });
+const ibmPlexMono = IBM_Plex_Mono({
+  subsets: ["latin"],
+  weight: ["300", "400"],
+});
 
 export default function MyApp({ Component, pageProps }: AppProps) {
   return (
     <WagmiProvider config={config}>
       <QueryClientProvider client={queryClient}>
         <RainbowKitProvider>
-          <main className={inter.className}>
+          <main className={ibmPlexMono.className}>
             <Component {...pageProps} />
           </main>
         </RainbowKitProvider>

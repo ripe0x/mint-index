@@ -5,10 +5,8 @@ import { client } from "@/config";
 import { CountdownTimer } from "./CountdownTimer";
 import type { TokenData, TokenMetadata } from "../types";
 import { useErrorHandler } from "@/app/utils/errors";
-import TokenMinter from "./TokenMinter";
 import DisplayName from "./DisplayName";
 import { EXTERNAL_MINT_BASE_URL } from "@/lib/constants";
-import { ExternalLink } from "lucide-react";
 
 type Props = {
   contractAddress: Address;
@@ -157,27 +155,27 @@ export const Token = ({ contractAddress, tokenId, deployerAddress }: Props) => {
       href={`${EXTERNAL_MINT_BASE_URL}/${deployerAddress}/${contractAddress}/${tokenId}`}
       target="_blank"
       rel="noreferrer"
-      className="bg-white group rounded-lg shadow-lg hover:shadow-xl transition duration-300 ease-in-out flex flex-col"
+      className="bg-white group hover:shadow-xl transition duration-300 ease-in-out flex flex-col"
     >
       <div className="">
-        <div className="p-4">
-          <h3 className="font-bold text-lg text-gray-800">{tokenData.name}</h3>
-          <p className="text-sm text-gray-600">
+        <div className="p-3">
+          <h3 className="text-sm font-bold opacity-75">{tokenData.name}</h3>
+          <p className="text-[14px] opacity-60 font-thin">
             <DisplayName address={deployerAddress} />
           </p>
-          {tokenData.description && (
+          {/* {tokenData.description && (
             <p className="text-sm text-gray-600 mt-2">
               {tokenData.description}
             </p>
-          )}
+          )} */}
         </div>
-        <div className="my-2 w-full">
+        <div className="w-full">
           {metadata?.image && (
             <img src={metadata.image} alt={tokenData.name} className="w-full" />
           )}
         </div>
         <div className="p-4">
-          <div className="text-sm ">
+          <div className="text-[12px]">
             {isMintActive ? (
               <>
                 <CountdownTimer
@@ -188,16 +186,25 @@ export const Token = ({ contractAddress, tokenId, deployerAddress }: Props) => {
             ) : (
               <>
                 <div className="flex justify-between">
-                  <p className="text-sm text-gray-500">
+                  <p className="text-[12px] opacity-60">
                     {totalMinted.toLocaleString()} minted
                   </p>
-                  <p className="text-sm text-gray-500 text-end">
+                  <p className="text-[12px] opacity-60 text-end">
                     closed on {closeDate.toLocaleString()}
                   </p>
                 </div>
               </>
             )}
           </div>
+
+          {tokenData.description && (
+            <>
+              <hr className="my-2" />
+              <p className="text-[12px] font-thin opacity-75 mt-2">
+                {tokenData.description}
+              </p>
+            </>
+          )}
         </div>
       </div>
     </a>

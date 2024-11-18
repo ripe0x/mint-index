@@ -66,10 +66,10 @@ export const CountdownTimer = ({ closeAt, totalMinted }: Props) => {
   if (isExpired) {
     return (
       <div className="flex justify-between">
-        <p className="text-sm text-gray-500">
+        <p className="text-[12px] opacity-60">
           {totalMinted.toLocaleString()} minted
         </p>
-        <p className="text-sm text-gray-500 text-end">
+        <p className="text-[12px] opacity-60 text-end">
           Mint closed on {closeDate.full}
         </p>
       </div>
@@ -82,10 +82,10 @@ export const CountdownTimer = ({ closeAt, totalMinted }: Props) => {
 
   return (
     <div className="flex justify-between">
-      <p className="text-sm text-gray-500">
+      <p className="text-[12px] opacity-60">
         {totalMinted.toLocaleString()} minted
       </p>
-      <p className="text-sm text-gray-500 text-end">{timeString}</p>
+      <p className="text-[12px] opacity-60 text-end">{timeString}</p>
     </div>
   );
 };

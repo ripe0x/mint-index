@@ -120,10 +120,7 @@ const TokenExplorer = () => {
     <div className="px-4 lg:px-8 xl:px-12 py-0">
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 lg:gap-8 xl:gap-16">
         {tokens.map((token) => (
-          <div
-            key={`${token.contractAddress}-${token.tokenId}`}
-            className="mb-8"
-          >
+          <div key={`${token.contractAddress}-${token.tokenId}`}>
             <Token
               contractAddress={token.contractAddress}
               tokenId={token.tokenId}
