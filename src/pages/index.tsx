@@ -5,7 +5,7 @@ export default function Home() {
   return (
     <>
       <Head>
-        <title>NetworkedNodes.art</title>
+        <title>Networked Nodes</title>
         <meta
           name="description"
           content="explore the latest creations on mint protocol"
@@ -29,9 +29,7 @@ export default function Home() {
       </Head>
       <div className="flex flex-col row-start-2 items-center sm:items-start">
         <div className="px-4 lg:px-8 xl:px-12 py-4 2xl:py-8 w-full leading-tight">
-          <h1 className="text-md text-gray-800 font-bold">
-            NetworkedNodes.art
-          </h1>
+          <h1 className="text-md text-gray-800 font-bold">Networked Nodes</h1>
           <p className="text-[12px] opacity-60 font-thin mt-1">
             explore the latest creations on{" "}
             <a
