@@ -61,6 +61,15 @@ export default function Home() {
             >
               ripe
             </a>
+            . logo by{" "}
+            <a
+              href="https://x.com/rotter_daniel"
+              target="_blank"
+              rel="noreferrer"
+              className="font-bold underline hover:no-underline"
+            >
+              daniel rotter
+            </a>
           </p>
         </div>
       </div>
