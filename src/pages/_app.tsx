@@ -2,7 +2,7 @@ import type { AppProps } from "next/app";
 import "../styles/global.css";
 import "@rainbow-me/rainbowkit/styles.css";
 import { RainbowKitProvider, getDefaultConfig } from "@rainbow-me/rainbowkit";
-import { mainnet } from "viem/chains";
+import { mainnet, sepolia } from "viem/chains";
 import { WagmiProvider } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { IBM_Plex_Mono } from "next/font/google";
@@ -10,7 +10,7 @@ import { IBM_Plex_Mono } from "next/font/google";
 const config = getDefaultConfig({
   appName: "My RainbowKit App",
   projectId: "YOUR_PROJECT_ID",
-  chains: [mainnet],
+  chains: [sepolia],
   ssr: true, // If your dApp uses server side rendering (SSR)
 });
 
