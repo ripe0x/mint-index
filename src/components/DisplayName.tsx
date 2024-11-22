@@ -3,7 +3,7 @@ import { Address } from "viem";
 import { useEnsName } from "wagmi";
 
 type Props = {
-  address: Address;
+  address?: Address;
 };
 
 const DisplayName = (props: Props) => {
@@ -16,14 +16,18 @@ const DisplayName = (props: Props) => {
 
   return (
     <>
-      {result.isLoading ? (
-        <span>{concatAddr(props.address)}</span>
-      ) : result.error ? (
-        <span>{concatAddr(props.address)}</span>
-      ) : result.data ? (
-        <span>{result.data}</span>
-      ) : (
-        <span>{concatAddr(props.address)}</span>
+      {props.address && (
+        <>
+          {result.isLoading ? (
+            <span>{concatAddr(props.address)}</span>
+          ) : result.error ? (
+            <span>{concatAddr(props.address)}</span>
+          ) : result.data ? (
+            <span>{result.data}</span>
+          ) : (
+            <span>{concatAddr(props.address)}</span>
+          )}
+        </>
       )}
     </>
   );

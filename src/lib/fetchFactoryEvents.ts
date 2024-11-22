@@ -1,9 +1,10 @@
 import { createPublicClient, http, parseAbiItem } from "viem";
 import { mainnet } from "viem/chains";
-
-const FACTORY_ADDRESS = "0xd717Fe677072807057B03705227EC3E3b467b670";
-// Use a specific RPC URL (you'll need to replace this with your own)
-const RPC_URL = `https://eth-mainnet.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API}`; // Replace with your Alchemy/Infura key
+import {
+  RPC_URL,
+  FACTORY_ADDRESS,
+  FACTORY_DEPLOYMENT_BLOCK,
+} from "./constants";
 
 const client = createPublicClient({
   chain: mainnet,
@@ -15,7 +16,7 @@ export async function fetchFactoryEvents() {
     // Let's try a specific block range where we know events exist
     // Based on Etherscan events
     const currentBlockNumber = await client.getBlockNumber();
-    const fromBlockNumber = BigInt(21167599); // contract deployment
+    const fromBlockNumber = BigInt(FACTORY_DEPLOYMENT_BLOCK); // contract deployment
     const toBlockNumber = currentBlockNumber;
 
     // First, let's try getting just the Created events

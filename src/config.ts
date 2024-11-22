@@ -9,18 +9,11 @@ export const config = createConfig({
   },
 });
 
-export const client = createPublicClient({
+export const mainnetClient = createPublicClient({
   chain: mainnet,
   transport: http(`
       https://eth-mainnet.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API}
     `),
-});
-
-export const configSepolia = createConfig({
-  chains: [sepolia],
-  transports: {
-    [sepolia.id]: http(),
-  },
 });
 
 export const clientSepolia = createPublicClient({
@@ -29,3 +22,6 @@ export const clientSepolia = createPublicClient({
       https://eth-sepolia.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API}
     `),
 });
+
+export const client =
+  process.env.NEXT_PUBLIC_IS_TESTNET === "true" ? clientSepolia : mainnetClient;

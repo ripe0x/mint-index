@@ -2,7 +2,6 @@ import { useState } from "react";
 import {
   useAccount,
   useWriteContract,
-  useReadContract,
   useWatchContractEvent,
   useTransaction,
   useBlock,
@@ -10,7 +9,6 @@ import {
 import { formatEther, type Hash } from "viem";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { abi1155 } from "@/abi/abi1155";
-import { ChevronDown } from "lucide-react";
 
 interface MinterProps {
   contractAddress: `0x${string}`;
@@ -22,7 +20,6 @@ const formatETH = (value: bigint) => {
 };
 
 export default function TokenMinter({ contractAddress, tokenId }: MinterProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
   const [amount, setAmount] = useState<string>("1");
   const [txHash, setTxHash] = useState<Hash>();
   const { isConnected } = useAccount();
@@ -32,16 +29,6 @@ export default function TokenMinter({ contractAddress, tokenId }: MinterProps) {
   });
   const baseFee =
     (block.data?.baseFeePerGas ?? BigInt(0)) * BigInt(60000) || BigInt(0);
-
-  const { data: tokenInfo } = useReadContract({
-    address: contractAddress,
-    abi: abi1155,
-    functionName: "get",
-    args: [BigInt(tokenId || "0")],
-    query: {
-      enabled: Boolean(tokenId),
-    },
-  });
 
   const totalPrice = baseFee * BigInt(amount || "1");
 
@@ -83,79 +70,55 @@ export default function TokenMinter({ contractAddress, tokenId }: MinterProps) {
       console.error("Mint error:", err);
     }
   };
-
-  if (!isExpanded) {
-    return (
-      <button
-        onClick={() => setIsExpanded(true)}
-        className="w-full flex items-center justify-center gap-2 py-2 px-4 mt-4 rounded-md hover:bg-gray-200 transition-colors border-t border-gray-300 border-top-solid hover:border-transparent"
-      >
-        <span>Mint</span>
-        <ChevronDown className="w-4 h-4" />
-      </button>
-    );
-  }
-
   return (
     <div>
-      {/* <div className="flex items-center justify-between mt-4">
-        <h2 className="font-bold text-lg">Mint Token</h2>
-        <button
-          onClick={() => setIsExpanded(false)}
-          className="text-gray-500 hover:text-gray-700 transition-colors"
-        >
-          <ChevronUp className="w-5 h-5" />
-        </button>
-      </div> */}
-
       {!isConnected ? (
         <div className="mb-4">
           <ConnectButton />
         </div>
       ) : (
         <div className="mt-4">
-          <div>
-            <label className="block text-sm font-medium text-gray-700 mb-1">
-              Amount
-            </label>
+          <div className="flex flex-row gap-2 mb-2">
             <input
               type="number"
               value={amount}
               onChange={(e) => setAmount(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md"
+              className="text-xs w-1/4 px-2 py-1 border border-gray-300"
               min="1"
             />
+
+            <button
+              onClick={handleMint}
+              disabled={
+                !tokenId || !amount || isMinting || (txHash && isWaitingTx)
+              }
+              className="text-xs w-full bg-black text-white px-2 py-1 hover:bg-gray-900 disabled:bg-gray-400 transition-colors hover:cursor-pointer"
+            >
+              {(txHash && isWaitingTx) || isMinting
+                ? "Processing..."
+                : `Mint (${formatETH(totalPrice)} ETH)`}
+            </button>
           </div>
 
-          {tokenInfo && (
+          {/* {tokenInfo && (
             <div className="p-3 bg-gray-50 rounded-md space-y-1">
-              <p className="text-sm text-gray-600">
+              <p className="text-[12px] text-gray-600">
                 Price per token: {formatETH(baseFee)} ETH
               </p>
-              <p className="font-medium">
+              <p className="text-[12px]">
                 Total price: {formatETH(totalPrice)} ETH
               </p>
             </div>
-          )}
-
-          <button
-            onClick={handleMint}
-            disabled={!tokenId || !amount || isMinting || isWaitingTx}
-            className="w-full bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 disabled:bg-gray-400 transition-colors"
-          >
-            {isMinting || isWaitingTx
-              ? "Processing..."
-              : `Mint Tokens (${formatETH(totalPrice)} ETH)`}
-          </button>
+          )} */}
 
           {mintError && (
-            <div className="p-3 bg-red-50 text-red-700 rounded-md text-sm">
+            <div className="text-[12px] p-3 bg-red-50 text-red-700 rounded-md text-sm">
               {(mintError as Error).message}
             </div>
           )}
 
           {mintSuccess && txHash && (
-            <div className="p-3 bg-green-50 text-green-700 rounded-md text-sm">
+            <div className="text-[12px] p-3 bg-green-50 text-green-700 rounded-md ">
               Successfully minted tokens!
               <a
                 href={`https://etherscan.io/tx/${txHash}`}
