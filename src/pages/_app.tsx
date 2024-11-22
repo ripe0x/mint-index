@@ -2,7 +2,7 @@ import type { AppProps } from "next/app";
 import "../styles/global.css";
 import "@rainbow-me/rainbowkit/styles.css";
 import { RainbowKitProvider, getDefaultConfig } from "@rainbow-me/rainbowkit";
-import { mainnet, sepolia } from "viem/chains";
+import { sepolia } from "viem/chains";
 import { WagmiProvider } from "wagmi";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { IBM_Plex_Mono } from "next/font/google";

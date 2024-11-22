@@ -1,13 +1,54 @@
 import { useRouter } from "next/router";
-import { useReadContract, useBlock } from "wagmi";
 import { abi1155 } from "@/abi/abi1155";
 import { formatEther, parseAbiItem } from "viem";
 import TokenMinter from "@/components/TokenMinter";
 import { useEffect, useMemo, useState } from "react";
 import { client, clientSepolia } from "@/config";
-import DisplayName from "@/components/DisplayName";
+
 import { useErrorHandler } from "@/app/utils/errors";
 import { TokenData, TokenMetadata } from "@/types";
+import { CountdownTimer } from "@/components/CountdownTimer";
+
+const getDisplayContent = (
+  metadata: TokenMetadata | null,
+  tokenData: TokenData
+) => {
+  if (
+    metadata?.animation_url &&
+    (metadata.animation_url.includes("html") ||
+      metadata.animation_url.includes("htm"))
+  ) {
+    return (
+      <iframe
+        src={metadata.animation_url}
+        className="w-full h-full"
+        frameBorder="0"
+        title={tokenData.name}
+      />
+    );
+  }
+  if (
+    metadata?.animation_url &&
+    (metadata.animation_url.includes("mp4") ||
+      metadata.animation_url.includes("webm"))
+  ) {
+    return (
+      <video
+        src={metadata.animation_url}
+        autoPlay
+        loop
+        muted
+        className="w-full"
+      />
+    );
+  }
+
+  if (metadata?.image) {
+    return <img src={metadata.image} alt={tokenData.name} className="w-full" />;
+  }
+
+  return null;
+};
 
 type MintEvent = {
   address: string;
@@ -20,129 +61,20 @@ export default function TokenPage() {
   const router = useRouter();
   console.log("router", router);
   const { contract, token } = router.query;
-  let contractAddress = contract as `0x${string}`;
-  let tokenId = token as string;
+  const contractAddress = contract as `0x${string}`;
+  const tokenId = token as string;
 
   console.log("contractAddress", contractAddress);
   console.log("tokenId", tokenId);
   const [mintHistory, setMintHistory] = useState<MintEvent[]>([]);
-  const [baseFee, setBaseFee] = useState<bigint>(BigInt(0));
+  // const [baseFee, setBaseFee] = useState<bigint>(BigInt(0));
 
   const [tokenData, setTokenData] = useState<TokenData | null>(null);
   const [metadata, setMetadata] = useState<TokenMetadata | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const { error, handleError } = useErrorHandler();
+  // const [baseFee, setBaseFee] = useState<bigint>(BigInt(0));
   const [totalMinted, setTotalMinted] = useState<number>(0);
-
-  const rendererabi = [
-    { inputs: [], name: "AmountTooLarge", type: "error" },
-    {
-      inputs: [
-        { internalType: "uint256", name: "tokenId", type: "uint256" },
-        {
-          components: [
-            { internalType: "string", name: "name", type: "string" },
-            { internalType: "string", name: "description", type: "string" },
-            { internalType: "address[]", name: "artifact", type: "address[]" },
-            { internalType: "uint32", name: "renderer", type: "uint32" },
-            { internalType: "uint32", name: "mintedBlock", type: "uint32" },
-            { internalType: "uint64", name: "closeAt", type: "uint64" },
-            { internalType: "uint128", name: "data", type: "uint128" },
-          ],
-          internalType: "struct Token",
-          name: "token",
-          type: "tuple",
-        },
-      ],
-      name: "animationURI",
-      outputs: [{ internalType: "string", name: "", type: "string" }],
-      stateMutability: "pure",
-      type: "function",
-    },
-    {
-      inputs: [
-        { internalType: "uint256", name: "tokenId", type: "uint256" },
-        {
-          components: [
-            { internalType: "string", name: "name", type: "string" },
-            { internalType: "string", name: "description", type: "string" },
-            { internalType: "address[]", name: "artifact", type: "address[]" },
-            { internalType: "uint32", name: "renderer", type: "uint32" },
-            { internalType: "uint32", name: "mintedBlock", type: "uint32" },
-            { internalType: "uint64", name: "closeAt", type: "uint64" },
-            { internalType: "uint128", name: "data", type: "uint128" },
-          ],
-          internalType: "struct Token",
-          name: "token",
-          type: "tuple",
-        },
-      ],
-      name: "generateSVG",
-      outputs: [{ internalType: "string", name: "", type: "string" }],
-      stateMutability: "view",
-      type: "function",
-    },
-    {
-      inputs: [
-        { internalType: "uint256", name: "tokenId", type: "uint256" },
-        {
-          components: [
-            { internalType: "string", name: "name", type: "string" },
-            { internalType: "string", name: "description", type: "string" },
-            { internalType: "address[]", name: "artifact", type: "address[]" },
-            { internalType: "uint32", name: "renderer", type: "uint32" },
-            { internalType: "uint32", name: "mintedBlock", type: "uint32" },
-            { internalType: "uint64", name: "closeAt", type: "uint64" },
-            { internalType: "uint128", name: "data", type: "uint128" },
-          ],
-          internalType: "struct Token",
-          name: "token",
-          type: "tuple",
-        },
-      ],
-      name: "imageURI",
-      outputs: [{ internalType: "string", name: "", type: "string" }],
-      stateMutability: "view",
-      type: "function",
-    },
-    {
-      inputs: [],
-      name: "name",
-      outputs: [{ internalType: "string", name: "", type: "string" }],
-      stateMutability: "pure",
-      type: "function",
-    },
-    {
-      inputs: [
-        { internalType: "uint256", name: "tokenId", type: "uint256" },
-        {
-          components: [
-            { internalType: "string", name: "name", type: "string" },
-            { internalType: "string", name: "description", type: "string" },
-            { internalType: "address[]", name: "artifact", type: "address[]" },
-            { internalType: "uint32", name: "renderer", type: "uint32" },
-            { internalType: "uint32", name: "mintedBlock", type: "uint32" },
-            { internalType: "uint64", name: "closeAt", type: "uint64" },
-            { internalType: "uint128", name: "data", type: "uint128" },
-          ],
-          internalType: "struct Token",
-          name: "token",
-          type: "tuple",
-        },
-      ],
-      name: "uri",
-      outputs: [{ internalType: "string", name: "", type: "string" }],
-      stateMutability: "view",
-      type: "function",
-    },
-    {
-      inputs: [],
-      name: "version",
-      outputs: [{ internalType: "uint256", name: "", type: "uint256" }],
-      stateMutability: "pure",
-      type: "function",
-    },
-  ];
 
   // Memoize the token identifier to prevent unnecessary re-fetches
   const tokenIdentifier = useMemo(
@@ -177,20 +109,6 @@ export default function TokenPage() {
         const block = await clientSepolia.getBlock({
           blockNumber: BigInt(blockNumber),
         });
-        console.log("Base fee:", block.baseFeePerGas);
-        // Get token URI
-        // const tokenUri = await clientSepolia.readContract({
-        //   address: contractAddress,
-        //   abi: abi1155,
-        //   functionName: "uri",
-        //   args: [BigInt(tokenId)],
-        //   blockNumber: blockNumber,
-        // });
-        // console.log("details", details);
-        // console.log("tokenUri", tokenUri);
-
-        // const blockNumber = BigInt(7130700);
-        // const block = await clientSepolia.getBlock({ blockNumber });
 
         const tokenUri = await clientSepolia.readContract({
           address: contractAddress,
@@ -198,19 +116,9 @@ export default function TokenPage() {
           functionName: "uri",
           args: [BigInt(tokenId)],
           blockNumber,
-          // @ts-ignore
+          // @ts-expect-error - `gasPrice` is not in the type
           gasPrice: block.baseFeePerGas,
         });
-
-        // const generateSVG = await clientSepolia.readContract({
-        //   address:
-        //     "0x9A821E095170Bf2E9Fa5A03a2Bb215236aadF1F9" as `0x${string}`,
-        //   abi: rendererabi,
-        //   functionName: "uri",
-        //   args: [BigInt(tokenId), details],
-        //   blockNumber: blockNumber,
-        // });
-        // console.log("generateSVG", generateSVG);
 
         if (!mounted) return;
 
@@ -255,7 +163,71 @@ export default function TokenPage() {
         }
       }
     }
+    const fetchTotalMinted = async () => {
+      if (!tokenId) return;
 
+      try {
+        const logs = await clientSepolia.getLogs({
+          address: contractAddress,
+          event: {
+            type: "event",
+            name: "NewMint",
+            inputs: [
+              { type: "uint256", name: "tokenId", indexed: true },
+              { type: "uint256", name: "unitPrice", indexed: false },
+              { type: "uint256", name: "amount", indexed: false },
+              { type: "address", name: "minter", indexed: false },
+            ],
+          },
+          args: {
+            tokenId: BigInt(tokenId),
+          },
+          fromBlock: BigInt(0),
+        });
+
+        const total = logs.reduce((acc, log) => {
+          const amount = Number(log.args.amount || BigInt(0));
+          return acc + amount;
+        }, 0);
+
+        setTotalMinted(total);
+      } catch (err) {
+        console.error("Error fetching mint events:", err);
+      }
+    };
+    async function fetchMintHistory() {
+      if (!tokenId) return;
+      const events = await clientSepolia.getLogs({
+        address: contractAddress as `0x${string}`,
+        event: parseAbiItem(
+          "event NewMint(address indexed minter, uint256 indexed tokenId, uint256 amount)"
+        ),
+        fromBlock: BigInt(0),
+        toBlock: "latest",
+        args: {
+          tokenId: BigInt(tokenId as string),
+        },
+      });
+
+      const history = await Promise.all(
+        events.map(async (event) => {
+          const block = await client.getBlock({
+            blockNumber: event.blockNumber,
+          });
+          return {
+            address: event.args.minter as `0x${string}`,
+            amount: Number(event.args.amount),
+            price: BigInt(0), // or any appropriate value
+            timestamp: Number(block.timestamp),
+          };
+        })
+      );
+
+      setMintHistory(history.sort((a, b) => b.timestamp - a.timestamp));
+    }
+
+    fetchMintHistory();
+    fetchTotalMinted();
     setLoading(true);
     fetchTokenData();
 
@@ -264,17 +236,25 @@ export default function TokenPage() {
     };
   }, [tokenIdentifier, handleError, contractAddress, tokenId]);
 
-  if (!tokenData) return <div>Loading...</div>;
+  if (!tokenData || loading) return <div>Loading...</div>;
+  if (error) return <div>Error: {error}</div>;
+
+  const displayContent = getDisplayContent(metadata, tokenData);
+
+  const now = Math.floor(Date.now() / 1000);
+  const isMintActive = tokenData.mintOpenUntil > now;
+  const closeDate = new Date(tokenData.mintOpenUntil * 1000);
 
   return (
     <div className="max-w-4xl mx-auto p-4">
       <div className="flex flex-col lg:flex-row gap-8">
         <div className="lg:w-2/3">
-          <img
+          {/* <img
             src={metadata?.image}
             alt={metadata?.name}
             className="w-full rounded-lg"
-          />
+          /> */}
+          <div className="w-full aspect-square">{displayContent}</div>
         </div>
 
         <div className="lg:w-1/3 space-y-6">
@@ -290,17 +270,46 @@ export default function TokenPage() {
           <p className="text-gray-700">{metadata?.description}</p>
 
           <div className="bg-gray-100 p-4 rounded-lg">
-            <p className="text-sm text-gray-600">Cost to mint</p>
-            <p className="text-xl font-medium">{formatEther(baseFee)} ETH</p>
+            {/* <p className="text-sm text-gray-600">Cost to mint</p> */}
+            {/* <p className="text-xl font-medium">{formatEther(baseFee)} ETH</p> */}
+            {tokenData.description && (
+              <>
+                <hr className="my-2" />
+                <p className="text-[12px] font-thin opacity-75 mt-2">
+                  {tokenData.description}
+                </p>
+              </>
+            )}
           </div>
 
+          <div className="text-[12px]">
+            {isMintActive ? (
+              <>
+                <CountdownTimer
+                  closeAt={tokenData.mintOpenUntil}
+                  totalMinted={totalMinted}
+                />
+              </>
+            ) : (
+              <>
+                <div className="flex justify-between">
+                  <p className="text-[12px] opacity-60">
+                    {totalMinted.toLocaleString()} minted
+                  </p>
+                  <p className="text-[12px] opacity-60 text-end">
+                    closed on {closeDate.toLocaleDateString()}
+                  </p>
+                </div>
+              </>
+            )}
+          </div>
           <TokenMinter
             contractAddress={contractAddress as `0x${string}`}
             tokenId={Number(tokenId)}
           />
 
           <div className="mt-8">
-            <h2 className="text-lg font-bold mb-4">Mint Timeline</h2>
+            <h2 className="text-sm font-bold mb-4">Mint Timeline</h2>
             <div className="space-y-3">
               {mintHistory.map((event, i) => (
                 <div
