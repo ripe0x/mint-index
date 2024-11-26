@@ -125,7 +125,7 @@ export default function TokenMinter({ contractAddress, tokenId }: MinterProps) {
           </div>
 
           {mintError && (
-            <div className="text-[10px] p-3 bg-red-50 text-red-700 rounded-md text-sm leading-snug text-wrap">
+            <div className="text-[10px] p-3 bg-red-50 text-red-700 rounded-md leading-snug text-wrap">
               {mintError instanceof Error
                 ? mintError.message
                 : "An error occurred during minting"}
