@@ -4,7 +4,6 @@ import { parseAbiItem } from "viem";
 import TokenMinter from "@/components/TokenMinter";
 import { useEffect, useMemo, useState } from "react";
 import { client } from "@/config";
-
 import { useErrorHandler } from "@/app/utils/errors";
 import { TokenData, TokenMetadata } from "@/types";
 import { CountdownTimer } from "@/components/CountdownTimer";
@@ -56,29 +55,24 @@ const getDisplayContent = (
 type MintEvent = {
   address: string;
   amount: number;
-  // price: bigint;
   timestamp: number;
   txHash: string;
 };
 
 export default function TokenPage() {
   const router = useRouter();
-  console.log("router", router);
   const { contract, token } = router.query;
   const contractAddress = contract as `0x${string}`;
   const tokenId = token as string;
 
-  console.log("contractAddress", contractAddress);
-  console.log("tokenId", tokenId);
   const [mintHistory, setMintHistory] = useState<MintEvent[]>([]);
-  // const [baseFee, setBaseFee] = useState<bigint>(BigInt(0));
-
   const [tokenData, setTokenData] = useState<TokenData>();
   const [metadata, setMetadata] = useState<TokenMetadata | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
   const { error, handleError } = useErrorHandler();
   const [totalMinted, setTotalMinted] = useState<number>(0);
   const [deployerAddress, setDeployerAddress] = useState<`0x${string}`>();
+  // const [lastBlock, setLastBlock] = useState<bigint>(BigInt(0));
 
   // Memoize the token identifier to prevent unnecessary re-fetches
   const tokenIdentifier = useMemo(
@@ -101,6 +95,7 @@ export default function TokenPage() {
           toBlock: "latest",
         });
         console.log("events", events);
+        // TODO: limit to the last x events to prevent rate limiting
         // find the event that matches the contract address
         const event = events.find(
           (event) =>
@@ -117,6 +112,30 @@ export default function TokenPage() {
 
     fetchDeployer();
   }, [contractAddress]);
+
+  // async function fetchMetadata(blockNumber: bigint, baseFeePerGas: bigint) {
+  //   if (!contractAddress || !tokenId) return;
+
+  //   console.log("fetchMetadata", block.data);
+
+  //   try {
+  //     const tokenUri = await client.readContract({
+  //       address: contractAddress,
+  //       abi: abi1155,
+  //       functionName: "uri",
+  //       args: [BigInt(tokenId)],
+  //       blockNumber: blockNumber,
+  //       // @ts-expect-error - `gasPrice` is not in the type
+  //       gasPrice: baseFeePerGas,
+  //     });
+
+  //     const response = await fetch(tokenUri);
+  //     const metadata = await response.json();
+  //     setMetadata(metadata);
+  //   } catch (err) {
+  //     handleError(err);
+  //   }
+  // }
 
   useEffect(() => {
     let mounted = true;
@@ -153,6 +172,18 @@ export default function TokenPage() {
           // @ts-expect-error - `gasPrice` is not in the type
           gasPrice: block.baseFeePerGas,
         });
+        // rendererUri
+        // const tokenUri = (await client.readContract({
+        //   address:
+        //     "0x6DE0A1bF17a3671cc85FF5915E28b266C22798Fd" as `0x${string}`,
+        //   abi: abiGasPriceRenderer,
+        //   functionName: "uri",
+        //   args: [BigInt(tokenId), details],
+        //   blockNumber,
+        //   // @ts-expect-error - `gasPrice` is not in the type
+        //   gasPrice: block.baseFeePerGas,
+        // })) as string;
+        // console.log("tokenUri", tokenUri);
 
         if (!mounted) return;
 
@@ -172,6 +203,7 @@ export default function TokenPage() {
           mintedBlock: Number(details[4]),
           closeAt: Number(details[5]),
           mintOpenUntil: Number(mintOpenUntil),
+          data: Number(details[6]),
         };
 
         setTokenData(data);
@@ -201,6 +233,13 @@ export default function TokenPage() {
       if (!tokenId) return;
 
       try {
+        // const logs = await fetchLogsInRange(
+        //   contractAddress,
+        //   Number(tokenId),
+        //   0,
+        //   0,
+        //   3
+        // );
         const logs = await client.getLogs({
           address: contractAddress,
           event: {
@@ -251,11 +290,21 @@ export default function TokenPage() {
     fetchTotalMinted();
     setLoading(true);
     fetchTokenData();
+    // setLastBlock(block.data?.number || BigInt(0));
 
     return () => {
       mounted = false;
     };
   }, [tokenIdentifier, handleError, contractAddress, tokenId]);
+
+  // if token's data = 1, refetch the metadata on each block
+  // useEffect(() => {
+  //   console.log("tokenData", tokenData);
+  //   if (tokenData?.data === 1 && block.data?.number !== lastBlock) {
+  //     fetchMetadata(block.data?.number, block.baseFeePerGas);
+  //     setLastBlock(block.data?.number || BigInt(0));
+  //   }
+  // }, [tokenData, block]);
 
   if (!tokenData || loading)
     return (
@@ -307,7 +356,7 @@ export default function TokenPage() {
               </p>
             </div>
 
-            <p className="text-[14px] opaicty-80">{metadata?.description}</p>
+            <p className="text-[12px] opacity-70">{metadata?.description}</p>
             <hr className="my-4" />
             <div className="text-[12px] mt-4 mb-2">
               {isMintActive ? (
@@ -330,10 +379,12 @@ export default function TokenPage() {
                 </>
               )}
             </div>
-            <TokenMinter
-              contractAddress={contractAddress as `0x${string}`}
-              tokenId={Number(tokenId)}
-            />
+            {isMintActive && (
+              <TokenMinter
+                contractAddress={contractAddress as `0x${string}`}
+                tokenId={Number(tokenId)}
+              />
+            )}
             <hr className="my-4" />
             <div className="mt-4">
               <div className="space-y-3">

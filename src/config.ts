@@ -1,13 +1,6 @@
 import { createPublicClient } from "viem";
-import { http, createConfig } from "wagmi";
+import { http } from "wagmi";
 import { mainnet, sepolia } from "wagmi/chains";
-
-export const config = createConfig({
-  chains: [mainnet],
-  transports: {
-    [mainnet.id]: http(),
-  },
-});
 
 export const mainnetClient = createPublicClient({
   chain: mainnet,
