@@ -12,9 +12,11 @@ export default function Layout({
 }) {
   return (
     <>
-      <div className="flex flex-col row-start-2 items-center sm:items-start">
+      <div
+        className={`flex flex-col row-start-2 items-center sm:items-start ${fontClass}`}
+      >
         <Header />
-        <main className={`${fontClass} w-full`}>{children}</main>
+        <main className="w-full">{children}</main>
         <Footer />
       </div>
     </>

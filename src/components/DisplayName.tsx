@@ -10,6 +10,7 @@ const DisplayName = (props: Props) => {
   const result = useEnsName({
     address: props.address,
   });
+
   const concatAddr = (addr: string) => {
     return `${addr.slice(0, 6)}...${addr.slice(-4)}`;
   };
