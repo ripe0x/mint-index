@@ -7,7 +7,6 @@ import {
   useBlock,
 } from "wagmi";
 import { formatEther, type Hash } from "viem";
-import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { abi1155 } from "@/abi/abi1155";
 
 interface MinterProps {
@@ -73,9 +72,9 @@ export default function TokenMinter({ contractAddress, tokenId }: MinterProps) {
   return (
     <div>
       {!isConnected ? (
-        <div className="mb-4">
-          <ConnectButton />
-        </div>
+        <p className="mb-4 text-[12px] w-full text-center px-2 py-1 bg-gray-200 text-gray-700">
+          Connect to mint
+        </p>
       ) : (
         <div className="mt-4">
           <div className="flex flex-row gap-2 mb-2">

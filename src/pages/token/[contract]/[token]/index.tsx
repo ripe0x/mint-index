@@ -9,7 +9,6 @@ import { useErrorHandler } from "@/app/utils/errors";
 import { TokenData, TokenMetadata } from "@/types";
 import { CountdownTimer } from "@/components/CountdownTimer";
 import Head from "next/head";
-import Header from "@/components/Header";
 import DisplayName from "@/components/DisplayName";
 import { FACTORY_ADDRESS, FACTORY_DEPLOYMENT_BLOCK } from "@/lib/constants";
 
@@ -59,6 +58,7 @@ type MintEvent = {
   amount: number;
   // price: bigint;
   timestamp: number;
+  txHash: string;
 };
 
 export default function TokenPage() {
@@ -229,11 +229,13 @@ export default function TokenPage() {
             const block = await client.getBlock({
               blockNumber: event.blockNumber,
             });
+            const txHash = event.transactionHash;
             return {
               address: event.args.minter as `0x${string}`,
               amount: Number(event.args.amount),
-              // price: BigInt(0), // or any appropriate value
+              price: BigInt(0), // or any appropriate value
               timestamp: Number(block.timestamp),
+              txHash,
             };
           })
         );
@@ -245,39 +247,7 @@ export default function TokenPage() {
         console.error("Error fetching mint events:", err);
       }
     };
-    // async function fetchMintHistory() {
-    //   if (!tokenId) return;
-    //   const events = await client.getLogs({
-    //     address: contractAddress as `0x${string}`,
-    //     event: parseAbiItem(
-    //       "event NewMint(address indexed minter, uint256 indexed tokenId, uint256 amount)"
-    //     ),
-    //     fromBlock: BigInt(0),
-    //     toBlock: "latest",
-    //     args: {
-    //       tokenId: BigInt(tokenId as string),
-    //     },
-    //   });
-    //   console.log("mint history events", events);
 
-    //   const history = await Promise.all(
-    //     events.map(async (event) => {
-    //       const block = await client.getBlock({
-    //         blockNumber: event.blockNumber,
-    //       });
-    //       return {
-    //         address: event.args.minter as `0x${string}`,
-    //         amount: Number(event.args.amount),
-    //         price: BigInt(0), // or any appropriate value
-    //         timestamp: Number(block.timestamp),
-    //       };
-    //     })
-    //   );
-
-    //   setMintHistory(history.sort((a, b) => b.timestamp - a.timestamp));
-    // }
-
-    // fetchMintHistory();
     fetchTotalMinted();
     setLoading(true);
     fetchTokenData();
@@ -287,7 +257,12 @@ export default function TokenPage() {
     };
   }, [tokenIdentifier, handleError, contractAddress, tokenId]);
 
-  if (!tokenData || loading) return <div>Loading...</div>;
+  if (!tokenData || loading)
+    return (
+      <div className="px-4 lg:px-8 text-[12px] xl:px-12 py-4 opacity-60 w-full text-center">
+        Loading token data...
+      </div>
+    );
   if (error) return <div>Error: {error}</div>;
 
   const displayContent = getDisplayContent(metadata, tokenData);
@@ -295,6 +270,10 @@ export default function TokenPage() {
   const now = Math.floor(Date.now() / 1000);
   const isMintActive = tokenData.mintOpenUntil > now;
   const closeDate = new Date(tokenData.mintOpenUntil * 1000);
+
+  console.log("metadata", metadata);
+  console.log("tokenData", tokenData);
+  console.log("totalMinted", totalMinted);
 
   return (
     <>
@@ -318,24 +297,24 @@ export default function TokenPage() {
 
         <link rel="icon" href="/networkednodes_black.svg" />
       </Head>
-      <Header />
+      {/* <Header /> */}
       <div className="px-4 lg:px-8 xl:px-12 py-0 w-full">
         <div className="flex flex-col lg:flex-row gap-8">
           <div className="lg:w-2/3">
             <div className="w-full aspect-square">{displayContent}</div>
           </div>
 
-          <div className="lg:w-1/3 space-y-6">
-            <div>
+          <div className="lg:w-1/3">
+            <div className="mb-2">
               <h1 className="text-md">{metadata?.name || tokenData.name}</h1>
               <p className="text-[12px] opacity-80">
                 By <DisplayName address={deployerAddress} />
               </p>
             </div>
 
-            <p className="text-gray-700">{metadata?.description}</p>
-
-            <div className="text-[12px]">
+            <p className="text-[14px] opaicty-80">{metadata?.description}</p>
+            <hr className="my-4" />
+            <div className="text-[12px] mt-4 mb-2">
               {isMintActive ? (
                 <>
                   <CountdownTimer
@@ -362,12 +341,15 @@ export default function TokenPage() {
             />
             <hr className="my-2" />
             <div className="mt-2">
-              <h2 className="text-xs  mb-4">Mint Timeline</h2>
+              <h2 className="text-[12px] mt-4 mb-4">Mint Timeline</h2>
               <div className="space-y-3">
                 {mintHistory.map((event, i) => (
-                  <div
+                  <a
                     key={i}
-                    className="flex justify-between items-center text-sm"
+                    className="flex justify-between items-center text-[12px] opacity-70 hover:opacity-90"
+                    href={`https://etherscan.io/tx/${event.txHash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
                   >
                     <div>
                       <DisplayName address={event.address as `0x${string}`} />
@@ -376,12 +358,11 @@ export default function TokenPage() {
                       </span>
                     </div>
                     <div className="text-right">
-                      {/* <div>{formatEther(event.price)} ETH</div> */}
                       <div className="text-gray-500">
                         {new Date(event.timestamp * 1000).toLocaleString()}
                       </div>
                     </div>
-                  </div>
+                  </a>
                 ))}
               </div>
             </div>

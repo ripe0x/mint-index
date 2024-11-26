@@ -6,7 +6,7 @@ import { CountdownTimer } from "./CountdownTimer";
 import type { TokenData, TokenMetadata } from "../types";
 import { useErrorHandler } from "@/app/utils/errors";
 import DisplayName from "./DisplayName";
-import { EXTERNAL_MINT_BASE_URL } from "@/lib/constants";
+import Link from "next/link";
 
 type Props = {
   contractAddress: Address;
@@ -34,6 +34,7 @@ export const Token = ({ contractAddress, tokenId, deployerAddress }: Props) => {
       if (!mounted) return;
 
       try {
+        const block = await client.getBlock();
         // Get token details
         const details = await client.readContract({
           address: contractAddress,
@@ -50,6 +51,9 @@ export const Token = ({ contractAddress, tokenId, deployerAddress }: Props) => {
           abi: abi1155,
           functionName: "uri",
           args: [BigInt(tokenId)],
+          blockNumber: block.number,
+          // @ts-expect-error - `gasPrice` is not in the type
+          gasPrice: block.baseFeePerGas,
         });
 
         if (!mounted) return;
@@ -210,10 +214,8 @@ export const Token = ({ contractAddress, tokenId, deployerAddress }: Props) => {
   const displayContent = getDisplayContent(metadata, tokenData);
 
   return (
-    <a
-      href={`${EXTERNAL_MINT_BASE_URL}/${deployerAddress}/${contractAddress}/${tokenId}`}
-      target="_blank"
-      rel="noreferrer"
+    <Link
+      href={`/token/${contractAddress}/${tokenId}`}
       className="bg-white group hover:shadow-xl relative hover:-mt-1 hover:pb-1 transition-all duration-150 ease-in-out flex flex-col"
     >
       <div className="p-3">
@@ -255,6 +257,6 @@ export const Token = ({ contractAddress, tokenId, deployerAddress }: Props) => {
           </>
         )}
       </div>
-    </a>
+    </Link>
   );
 };
