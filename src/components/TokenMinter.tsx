@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import {
   useAccount,
   useWriteContract,
@@ -21,15 +21,16 @@ const formatETH = (value: bigint) => {
 export default function TokenMinter({ contractAddress, tokenId }: MinterProps) {
   const [amount, setAmount] = useState<string>("1");
   const [txHash, setTxHash] = useState<Hash>();
+  const [totalPrice, setTotalPrice] = useState<bigint>(BigInt(0));
   const { isConnected } = useAccount();
 
   const block = useBlock({
     watch: true,
   });
-  const baseFee =
-    (block.data?.baseFeePerGas ?? BigInt(0)) * BigInt(60000) || BigInt(0);
 
-  const totalPrice = baseFee * BigInt(amount || "1");
+  // const baseFee =
+  //   (block.data?.baseFeePerGas ?? BigInt(0)) * BigInt(60000) || BigInt(0);
+  // const totalPrice = baseFee * BigInt(amount || "1");
 
   const {
     writeContractAsync: mint,
@@ -41,9 +42,9 @@ export default function TokenMinter({ contractAddress, tokenId }: MinterProps) {
     address: contractAddress,
     abi: abi1155,
     eventName: "NewMint",
-    onLogs(logs) {
-      console.log("New mint event:", logs);
-    },
+    // onLogs(logs) {
+    //   // console.log("New mint event:", logs);
+    // },
   });
 
   const { isLoading: isWaitingTx, isSuccess: mintSuccess } = useTransaction({
@@ -69,6 +70,15 @@ export default function TokenMinter({ contractAddress, tokenId }: MinterProps) {
       console.error("Mint error:", err);
     }
   };
+
+  useEffect(() => {
+    if (block.data && amount) {
+      const baseFee =
+        (block.data?.baseFeePerGas ?? BigInt(0)) * BigInt(60000) || BigInt(0);
+      setTotalPrice(baseFee * BigInt(amount));
+    }
+  }, [amount, block.data]);
+
   return (
     <div>
       {!isConnected ? (
