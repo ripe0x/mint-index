@@ -4,7 +4,7 @@ import React from "react";
 
 const Header = () => {
   return (
-    <div className="px-4 lg:px-8 xl:px-12 py-4 2xl:py-8 w-full leading-tight flex flex-row gap-2 justify-between">
+    <div className="px-4 lg:px-8 xl:px-12 py-4 2xl:py-8 w-full leading-tight flex flex-col sm:flex-row gap-2 sm:justify-between">
       <div className="flex flex-row gap-2 items-center">
         <Link href="/">
           <img
@@ -30,7 +30,7 @@ const Header = () => {
           </p>
         </div>
       </div>
-      <div id="connectButtonWrapper">
+      <div id="connectButtonWrapper" className="flex justify-center sm:block">
         <ConnectButton showBalance={false} label="Connect" />
       </div>
     </div>
