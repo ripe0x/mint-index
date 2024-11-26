@@ -1,13 +1,8 @@
 import { useEffect, useState } from "react";
-import {
-  useAccount,
-  useWriteContract,
-  useWatchContractEvent,
-  useTransaction,
-  useBlock,
-} from "wagmi";
+import { useAccount, useWriteContract, useTransaction, useBlock } from "wagmi";
 import { formatEther, type Hash } from "viem";
 import { abi1155 } from "@/abi/abi1155";
+import { client } from "@/config";
 
 interface MinterProps {
   contractAddress: `0x${string}`;
@@ -21,16 +16,13 @@ const formatETH = (value: bigint) => {
 export default function TokenMinter({ contractAddress, tokenId }: MinterProps) {
   const [amount, setAmount] = useState<string>("1");
   const [txHash, setTxHash] = useState<Hash>();
-  const [totalPrice, setTotalPrice] = useState<bigint>(BigInt(0));
-  const { isConnected } = useAccount();
+  const [mintPrice, setMintPrice] = useState<bigint>(BigInt(0));
+  const { isConnected, address } = useAccount();
 
-  const block = useBlock({
+  // Watch for new blocks to update price
+  const { data: blockData } = useBlock({
     watch: true,
   });
-
-  // const baseFee =
-  //   (block.data?.baseFeePerGas ?? BigInt(0)) * BigInt(60000) || BigInt(0);
-  // const totalPrice = baseFee * BigInt(amount || "1");
 
   const {
     writeContractAsync: mint,
@@ -38,29 +30,37 @@ export default function TokenMinter({ contractAddress, tokenId }: MinterProps) {
     error: mintError,
   } = useWriteContract();
 
-  useWatchContractEvent({
-    address: contractAddress,
-    abi: abi1155,
-    eventName: "NewMint",
-    // onLogs(logs) {
-    //   // console.log("New mint event:", logs);
-    // },
-  });
-
   const { isLoading: isWaitingTx, isSuccess: mintSuccess } = useTransaction({
     hash: txHash,
   });
 
+  // Calculate mint price based on contract logic
+  const calculateMintPrice = (baseFee: bigint, amount: string): bigint => {
+    const unitPrice = baseFee * BigInt(60000);
+    return unitPrice * BigInt(amount);
+  };
+
   const handleMint = async () => {
-    if (!tokenId || !amount) return;
+    if (!tokenId || !amount || !address || !blockData?.baseFeePerGas) return;
+
+    setTxHash(undefined);
 
     try {
+      // get latest block data
+      const block = await client.getBlock();
+
+      // Calculate price based on current block's base fee
+      const price = calculateMintPrice(
+        block?.baseFeePerGas || BigInt(0),
+        amount
+      );
+
       const hash = await mint({
         address: contractAddress,
         abi: abi1155,
         functionName: "mint",
         args: [BigInt(tokenId), BigInt(amount)],
-        value: totalPrice,
+        value: price, // Send the exact required amount
       });
 
       if (hash) {
@@ -68,16 +68,27 @@ export default function TokenMinter({ contractAddress, tokenId }: MinterProps) {
       }
     } catch (err) {
       console.error("Mint error:", err);
+      if (err instanceof Error) {
+        if (err.message.includes("MintPriceNotMet")) {
+          alert("Price increased during transaction. Please try again.");
+        } else if (err.message.includes("MintClosed")) {
+          alert("Minting window has closed for this token.");
+        } else if (err.message.includes("NonExistentToken")) {
+          alert("This token does not exist.");
+        } else if (err.message.includes("user rejected")) {
+          return;
+        }
+      }
     }
   };
 
+  // Update price when block changes or amount changes
   useEffect(() => {
-    if (block.data && amount) {
-      const baseFee =
-        (block.data?.baseFeePerGas ?? BigInt(0)) * BigInt(60000) || BigInt(0);
-      setTotalPrice(baseFee * BigInt(amount));
+    if (blockData?.baseFeePerGas) {
+      const newPrice = calculateMintPrice(blockData.baseFeePerGas, amount);
+      setMintPrice(newPrice);
     }
-  }, [amount, block.data]);
+  }, [blockData?.baseFeePerGas, amount]);
 
   return (
     <div>
@@ -99,35 +110,30 @@ export default function TokenMinter({ contractAddress, tokenId }: MinterProps) {
             <button
               onClick={handleMint}
               disabled={
-                !tokenId || !amount || isMinting || (txHash && isWaitingTx)
+                !tokenId ||
+                !amount ||
+                isMinting ||
+                (txHash && isWaitingTx) ||
+                !blockData?.baseFeePerGas
               }
               className="text-xs w-full bg-black text-white px-2 py-1 hover:bg-gray-900 disabled:bg-gray-400 transition-colors hover:cursor-pointer"
             >
               {(txHash && isWaitingTx) || isMinting
                 ? "Processing..."
-                : `Mint (${formatETH(totalPrice)} ETH)`}
+                : `Mint (${formatETH(mintPrice)} ETH)`}
             </button>
           </div>
 
-          {/* {tokenInfo && (
-            <div className="p-3 bg-gray-50 rounded-md space-y-1">
-              <p className="text-[12px] text-gray-600">
-                Price per token: {formatETH(baseFee)} ETH
-              </p>
-              <p className="text-[12px]">
-                Total price: {formatETH(totalPrice)} ETH
-              </p>
-            </div>
-          )} */}
-
           {mintError && (
-            <div className="text-[12px] p-3 bg-red-50 text-red-700 rounded-md text-sm">
-              {(mintError as Error).message}
+            <div className="text-[10px] p-3 bg-red-50 text-red-700 rounded-md text-sm leading-snug text-wrap">
+              {mintError instanceof Error
+                ? mintError.message
+                : "An error occurred during minting"}
             </div>
           )}
 
           {mintSuccess && txHash && (
-            <div className="text-[12px] p-3 bg-green-50 text-green-700 rounded-md ">
+            <div className="text-[12px] p-3 bg-green-50 text-green-700 rounded-md">
               Successfully minted tokens!
               <a
                 href={`https://etherscan.io/tx/${txHash}`}
