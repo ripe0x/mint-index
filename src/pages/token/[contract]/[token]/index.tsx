@@ -266,14 +266,9 @@ export default function TokenPage() {
   if (error) return <div>Error: {error}</div>;
 
   const displayContent = getDisplayContent(metadata, tokenData);
-
   const now = Math.floor(Date.now() / 1000);
   const isMintActive = tokenData.mintOpenUntil > now;
   const closeDate = new Date(tokenData.mintOpenUntil * 1000);
-
-  console.log("metadata", metadata);
-  console.log("tokenData", tokenData);
-  console.log("totalMinted", totalMinted);
 
   return (
     <>
@@ -339,9 +334,8 @@ export default function TokenPage() {
               contractAddress={contractAddress as `0x${string}`}
               tokenId={Number(tokenId)}
             />
-            <hr className="my-2" />
-            <div className="mt-2">
-              <h2 className="text-[12px] mt-4 mb-4">Mint Timeline</h2>
+            <hr className="my-4" />
+            <div className="mt-4">
               <div className="space-y-3">
                 {mintHistory.map((event, i) => (
                   <a
