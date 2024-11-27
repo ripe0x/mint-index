@@ -322,21 +322,15 @@ export default function TokenPage() {
   return (
     <>
       <Head>
-        <title>{tokenData.name} | Networked Nodes</title>
+        <title>{tokenData.name} | Nodeworks</title>
         <meta name="description" content={metadata?.description} />
-        <meta
-          property="og:title"
-          content={`${tokenData.name} | Networked Nodes`}
-        />
+        <meta property="og:title" content={`${tokenData.name} | Nodeworks`} />
         <meta property="og:description" content={metadata?.description} />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://networkednodes.art" />
+        <meta property="og:url" content="https://nodeworks.art" />
         <meta name="twitter:card" content="summary" />
         <meta name="twitter:site" content="@ripe0x" />
-        <meta
-          name="twitter:title"
-          content={`${tokenData.name} | Networked Nodes`}
-        />
+        <meta name="twitter:title" content={`${tokenData.name} | Nodeworks`} />
         <meta name="twitter:description" content={metadata?.description} />
 
         <link rel="icon" href="/networkednodes_black.svg" />

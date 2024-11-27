@@ -5,12 +5,12 @@ export default function Home() {
   return (
     <>
       <Head>
-        <title>Networked Nodes</title>
+        <title>Nodeworks</title>
         <meta
           name="description"
           content="explore the latest creations on mint protocol"
         />
-        <meta property="og:title" content="NetworkedNodes.art" />
+        <meta property="og:title" content="Nodeworks.art" />
         <meta
           property="og:description"
           content="explore the latest creations on mint protocol"

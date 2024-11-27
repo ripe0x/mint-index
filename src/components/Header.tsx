@@ -9,13 +9,13 @@ const Header = () => {
         <Link href="/">
           <img
             src="/networkednodes_black.svg"
-            alt="Networked Nodes"
+            alt="Nodeworks logo"
             className="w-14 h-14"
           />
         </Link>
         <div>
           <Link href="/">
-            <h1 className="text-md text-gray-800 font-bold">Networked Nodes</h1>
+            <h1 className="text-md text-gray-800 font-bold">Nodeworks</h1>
           </Link>
           <p className="text-[12px] opacity-60 font-thin mt-1">
             explore the latest creations on{" "}
