@@ -216,6 +216,7 @@ export const Token = ({ contractAddress, tokenId, deployerAddress }: Props) => {
   return (
     <Link
       href={`/token/${contractAddress}/${tokenId}`}
+      // href={`https://networked.art//${deployerAddress}/${contractAddress}/${tokenId}`}
       className="bg-white group hover:shadow-xl relative hover:-mt-1 hover:pb-1 transition-all duration-150 ease-in-out flex flex-col"
     >
       <div className="p-3">

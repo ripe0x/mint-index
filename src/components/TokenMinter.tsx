@@ -1,8 +1,8 @@
+"use client";
 import { useEffect, useState } from "react";
 import { useAccount, useWriteContract, useTransaction, useBlock } from "wagmi";
 import { formatEther, type Hash } from "viem";
 import { abi1155 } from "@/abi/abi1155";
-import { client } from "@/config";
 
 interface MinterProps {
   contractAddress: `0x${string}`;
@@ -19,24 +19,26 @@ export default function TokenMinter({ contractAddress, tokenId }: MinterProps) {
   const [mintPrice, setMintPrice] = useState<bigint>(BigInt(0));
   const { isConnected, address } = useAccount();
 
-  // Watch for new blocks to update price
+  // Watch for new blocks
   const { data: blockData } = useBlock({
     watch: true,
   });
 
+  // Write contract
   const {
     writeContractAsync: mint,
     isPending: isMinting,
     error: mintError,
   } = useWriteContract();
 
+  // Wait for transaction
   const { isLoading: isWaitingTx, isSuccess: mintSuccess } = useTransaction({
     hash: txHash,
   });
 
   // Calculate mint price based on contract logic
-  const calculateMintPrice = (baseFee: bigint, amount: string): bigint => {
-    const unitPrice = baseFee * BigInt(60000);
+  const calculateMintPrice = (baseFee: bigint, amount: number): bigint => {
+    const unitPrice = baseFee * BigInt(60_000);
     return unitPrice * BigInt(amount);
   };
 
@@ -46,21 +48,17 @@ export default function TokenMinter({ contractAddress, tokenId }: MinterProps) {
     setTxHash(undefined);
 
     try {
-      // get latest block data
-      const block = await client.getBlock();
-
-      // Calculate price based on current block's base fee
-      const price = calculateMintPrice(
-        block?.baseFeePerGas || BigInt(0),
-        amount
-      );
+      // Add a 20% buffer to account for base fee increases
+      const BUFFER_PERCENTAGE = BigInt(120); // 120% of the calculated price
+      const basePrice = calculateMintPrice(blockData.baseFeePerGas, +amount);
+      const priceWithBuffer = (basePrice * BUFFER_PERCENTAGE) / BigInt(100);
 
       const hash = await mint({
         address: contractAddress,
         abi: abi1155,
         functionName: "mint",
         args: [BigInt(tokenId), BigInt(amount)],
-        value: price, // Send the exact required amount
+        value: priceWithBuffer,
       });
 
       if (hash) {
@@ -70,11 +68,13 @@ export default function TokenMinter({ contractAddress, tokenId }: MinterProps) {
       console.error("Mint error:", err);
       if (err instanceof Error) {
         if (err.message.includes("MintPriceNotMet")) {
-          alert("Price increased during transaction. Please try again.");
+          alert(
+            "Price increased significantly during transaction. Please try again."
+          );
         } else if (err.message.includes("MintClosed")) {
           alert("Minting window has closed for this token.");
         } else if (err.message.includes("NonExistentToken")) {
-          alert("This token does not exist.");
+          // alert("This token does not exist.")
         } else if (err.message.includes("user rejected")) {
           return;
         }
@@ -85,7 +85,7 @@ export default function TokenMinter({ contractAddress, tokenId }: MinterProps) {
   // Update price when block changes or amount changes
   useEffect(() => {
     if (blockData?.baseFeePerGas) {
-      const newPrice = calculateMintPrice(blockData.baseFeePerGas, amount);
+      const newPrice = calculateMintPrice(blockData.baseFeePerGas, +amount);
       setMintPrice(newPrice);
     }
   }, [blockData?.baseFeePerGas, amount]);
