@@ -7,37 +7,45 @@ import {
   midnightTheme,
 } from "@rainbow-me/rainbowkit";
 import { mainnet, sepolia } from "viem/chains";
-import { fallback, http, WagmiProvider } from "wagmi";
+import { WagmiProvider } from "wagmi";
+import { fallback, http } from "viem"; // Changed this import
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { IBM_Plex_Mono } from "next/font/google";
 import Layout from "@/components/Layout";
+
+const ALCHEMY_KEY = process.env.NEXT_PUBLIC_ALCHEMY_API_KEY;
+const INFURA_KEY = process.env.NEXT_PUBLIC_INFURA_API_KEY;
+
+const mainnetTransports = fallback([
+  http(`https://eth-mainnet.g.alchemy.com/v2/${ALCHEMY_KEY}`),
+  http(`https://mainnet.infura.io/v3/${INFURA_KEY}`),
+  http(),
+]);
+
+const sepoliaTransports = fallback([
+  http(`https://eth-sepolia.g.alchemy.com/v2/${ALCHEMY_KEY}`),
+  http(`https://sepolia.infura.io/v3/${INFURA_KEY}`),
+  http(),
+]);
 
 const config = getDefaultConfig({
   appName: "My RainbowKit App",
   projectId: "YOUR_PROJECT_ID",
   chains: [process.env.NEXT_PUBLIC_IS_TESTNET ? sepolia : mainnet],
-  ssr: true,
+  ssr: false,
   transports: {
-    [mainnet.id]: fallback([
-      http(
-        `https://eth-mainnet.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API_KEY}`
-      ),
-      http(
-        `https://mainnet.infura.io/v3/${process.env.NEXT_PUBLIC_INFURA_API_KEY}`
-      ),
-      http(),
-    ]),
-    [sepolia.id]: fallback([
-      http(
-        `https://eth-sepolia.g.alchemy.com/v2/${process.env.NEXT_PUBLIC_ALCHEMY_API_KEY}`
-      ),
-      http(
-        `https://sepolia.infura.io/v3/${process.env.NEXT_PUBLIC_INFURA_API_KEY}`
-      ),
-      http(),
-    ]),
+    [mainnet.id]: mainnetTransports,
+    [sepolia.id]: sepoliaTransports,
   },
 });
+
+// Optional: verify env vars are loaded
+if (
+  !process.env.NEXT_PUBLIC_ALCHEMY_API_KEY ||
+  !process.env.NEXT_PUBLIC_INFURA_API_KEY
+) {
+  throw new Error("Missing environment variables");
+}
 
 const queryClient = new QueryClient({
   defaultOptions: {
