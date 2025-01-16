@@ -16,7 +16,7 @@ export default function Home() {
           content="explore the latest creations on mint protocol"
         />
         <meta property="og:type" content="website" />
-        <meta property="og:url" content="https://networkednodes.art" />
+        <meta property="og:url" content="https://nodeworks.art" />
         <meta name="twitter:card" content="summary" />
         <meta name="twitter:site" content="@ripe0x" />
         <meta name="twitter:title" content="NetworkedNodes.art" />

@@ -1,10 +1,35 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
-  // add image hostname
+  // Config options here
   images: {
     domains: ["ipfs.io"],
+  },
+  async redirects() {
+    return [
+      {
+        source: "/:path*",
+        has: [
+          {
+            type: "host",
+            value: "mint-index.netlify.app",
+          },
+        ],
+        destination: "https://nodeworks.art/:path*",
+        permanent: true,
+      },
+      {
+        source: "/:path*",
+        has: [
+          {
+            type: "host",
+            value: "networkednodes.art",
+          },
+        ],
+        destination: "https://nodeworks.art/:path*",
+        permanent: true,
+      },
+    ];
   },
 };
 
