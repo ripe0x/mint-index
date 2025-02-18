@@ -1,5 +1,5 @@
 import { abi1155 } from "@/abi/abi1155";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { Address } from "viem";
 import { client } from "@/config";
 import { CountdownTimer } from "./CountdownTimer";
@@ -18,6 +18,8 @@ export const Token = ({ contractAddress, tokenId, deployerAddress }: Props) => {
   const [tokenData, setTokenData] = useState<TokenData | null>(null);
   const [metadata, setMetadata] = useState<TokenMetadata | null>(null);
   const [loading, setLoading] = useState<boolean>(true);
+  const [isTextTruncated, setIsTextTruncated] = useState(false);
+  const textRef = useRef<HTMLParagraphElement>(null);
   const { error, handleError } = useErrorHandler();
   const [totalMinted, setTotalMinted] = useState<number>(0);
 
@@ -107,6 +109,16 @@ export const Token = ({ contractAddress, tokenId, deployerAddress }: Props) => {
       mounted = false;
     };
   }, [tokenIdentifier, handleError, contractAddress, tokenId]);
+
+  useEffect(() => {
+    if (textRef.current) {
+      const lineHeight = parseInt(
+        window.getComputedStyle(textRef.current).lineHeight
+      );
+      const height = textRef.current.offsetHeight;
+      setIsTextTruncated(height > lineHeight * 4);
+    }
+  }, [tokenData?.description]);
 
   // Get total minted from events
   useEffect(() => {
@@ -263,9 +275,17 @@ export const Token = ({ contractAddress, tokenId, deployerAddress }: Props) => {
         {tokenData.description && (
           <>
             <hr className="my-2" />
-            <p className="text-[12px] font-thin opacity-75 mt-2">
-              {tokenData.description}
-            </p>
+            <div className="relative">
+              <p
+                ref={textRef}
+                className="text-[12px] font-thin opacity-75 mt-2 line-clamp-3"
+              >
+                {tokenData.description}
+              </p>
+              {isTextTruncated && (
+                <div className="absolute bottom-0 left-0 w-full h-8 bg-gradient-to-t from-white to-transparent" />
+              )}
+            </div>
           </>
         )}
       </div>

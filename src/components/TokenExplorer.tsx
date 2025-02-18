@@ -16,8 +16,11 @@ type TokenInfo = {
 
 const TokenExplorer = () => {
   const [tokens, setTokens] = useState<TokenInfo[]>([]);
+  const [displayedTokens, setDisplayedTokens] = useState<number>(30);
   const [loading, setLoading] = useState(true);
+  const [allLoaded, setAllLoaded] = useState(false);
   const { error, handleError } = useErrorHandler();
+  const observerTarget = React.useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     async function getAllTokens() {
@@ -103,6 +106,29 @@ const TokenExplorer = () => {
     getAllTokens();
   }, [handleError]);
 
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && !loading && !allLoaded) {
+          setDisplayedTokens((prev) => {
+            const next = prev + 30;
+            if (next >= tokens.length) {
+              setAllLoaded(true);
+            }
+            return next;
+          });
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    if (observerTarget.current) {
+      observer.observe(observerTarget.current);
+    }
+
+    return () => observer.disconnect();
+  }, [loading, allLoaded, tokens.length]);
+
   if (loading)
     return (
       <div className="px-4 lg:px-8 text-xs xl:px-12 py-4 opacity-60 w-full">
@@ -119,7 +145,7 @@ const TokenExplorer = () => {
   return (
     <div className="px-4 lg:px-8 xl:px-12 py-0 w-full">
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 lg:gap-8 xl:gap-16 w-full">
-        {tokens.map((token) => (
+        {tokens.slice(0, displayedTokens).map((token) => (
           <div
             key={`${token.contractAddress}-${token.tokenId}`}
             className="w-full min-h-60"
@@ -132,6 +158,19 @@ const TokenExplorer = () => {
           </div>
         ))}
       </div>
+      {!loading && !allLoaded && (
+        <div
+          ref={observerTarget}
+          className="w-full h-20 flex items-center justify-center text-xs opacity-60"
+        >
+          Loading more tokens...
+        </div>
+      )}
+      {allLoaded && tokens.length > 0 && (
+        <div className="w-full h-20 flex items-center justify-center text-xs opacity-60">
+          All tokens loaded
+        </div>
+      )}
     </div>
   );
 };
