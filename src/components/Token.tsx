@@ -202,6 +202,17 @@ export const Token = ({ contractAddress, tokenId, deployerAddress }: Props) => {
       );
     }
 
+    // if metatadata?.image is ipfs://, fetch the image from ipfs
+    if (metadata?.image && metadata?.image.includes("ipfs://")) {
+      return (
+        <img
+          src={`https://ipfs.io/ipfs/${metadata.image.slice(7)}`}
+          alt={tokenData.name}
+          className="w-full"
+        />
+      );
+    }
+
     if (metadata?.image) {
       return (
         <img src={metadata.image} alt={tokenData.name} className="w-full" />

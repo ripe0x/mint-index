@@ -45,6 +45,17 @@ const getDisplayContent = (
     );
   }
 
+  // if metatadata?.image is ipfs://, fetch the image from ipfs
+  if (metadata?.image && metadata?.image.includes("ipfs://")) {
+    return (
+      <img
+        src={`https://ipfs.io/ipfs/${metadata.image.slice(7)}`}
+        alt={tokenData.name}
+        className="w-full"
+      />
+    );
+  }
+
   if (metadata?.image) {
     return <img src={metadata.image} alt={tokenData.name} className="w-full" />;
   }
@@ -212,6 +223,7 @@ export default function TokenPage() {
         try {
           const response = await fetch(tokenUri);
           const metadata = await response.json();
+
           if (mounted) {
             setMetadata(metadata);
           }
