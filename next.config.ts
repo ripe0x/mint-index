@@ -23,7 +23,7 @@ const nextConfig: NextConfig = {
         has: [
           {
             type: "host",
-            value: "networkednodes.art",
+            value: "nodeworks.art",
           },
         ],
         destination: "https://nodeworks.art/:path*",
