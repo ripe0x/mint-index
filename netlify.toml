@@ -1,0 +1,11 @@
+[[redirects]]
+  from = "https://mint-index.netlify.app/*"
+  to = "https://nodeworks.art/:splat"
+  status = 301
+  force = true
+
+[[redirects]]
+  from = "https://networkednodes.art/*"
+  to = "https://nodeworks.art/:splat"
+  status = 301
+  force = true
