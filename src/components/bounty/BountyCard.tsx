@@ -181,14 +181,14 @@ export const BountyCard: React.FC<BountyCardProps> = ({
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow relative">
       {/* Etherscan link positioned absolutely on desktop only */}
-      <a
+      {/* <a
         href={`https://etherscan.io/address/${bountyContract}`}
         target="_blank"
         rel="noopener noreferrer"
         className="hidden sm:block absolute top-4 right-4 text-xs text-blue-600 hover:underline"
       >
         View on Etherscan →
-      </a>
+      </a> */}
 
       <div className="flex gap-4">
         {/* Token Image - hidden on mobile */}
@@ -366,14 +366,14 @@ export const BountyCard: React.FC<BountyCardProps> = ({
             Bounty Claimed
           </button>
         )}
-        <a
+        {/* <a
           href={`https://etherscan.io/address/${bountyContract}`}
           target="_blank"
           rel="noopener noreferrer"
           className="block text-[11px] text-blue-600 hover:underline text-center mt-2"
         >
           View on Etherscan →
-        </a>
+        </a> */}
       </div>
 
       <TransactionStatus
