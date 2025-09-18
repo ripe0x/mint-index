@@ -302,16 +302,14 @@ export const BountyCard: React.FC<BountyCardProps> = ({
 
         {/* Button column - hidden on mobile, shown on desktop */}
         <div className="flex-shrink-0 items-center hidden sm:flex">
-          {!isConnected ? (
-            <div className="py-2 px-4 rounded bg-gray-100 text-gray-600 text-sm text-center">
-              Connect wallet
-            </div>
-          ) : status === "claimable" && !isOwner ? (
+          {status === "claimable" && !isOwner ? (
             <button
-              onClick={handleClaim}
-              disabled={isWritePending || isReceiptLoading}
+              onClick={isConnected ? handleClaim : undefined}
+              disabled={!isConnected || isWritePending || isReceiptLoading}
               className={`py-2 px-4 rounded font-medium text-sm transition-colors ${
-                isWritePending || isReceiptLoading
+                !isConnected
+                  ? "bg-green-600 text-white cursor-not-allowed opacity-30"
+                  : isWritePending || isReceiptLoading
                   ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                   : "bg-green-600 text-white hover:bg-green-700"
               }`}
@@ -335,19 +333,14 @@ export const BountyCard: React.FC<BountyCardProps> = ({
 
       {/* Button row for mobile - shown below content */}
       <div className="sm:hidden mt-3 pt-3 border-t">
-        {!isConnected ? (
+        {status === "claimable" && !isOwner ? (
           <button
-            className="w-full py-2 px-4 rounded bg-gray-100 text-gray-600 text-sm text-center"
-            disabled
-          >
-            Connect wallet
-          </button>
-        ) : status === "claimable" && !isOwner ? (
-          <button
-            onClick={handleClaim}
-            disabled={isWritePending || isReceiptLoading}
+            onClick={isConnected ? handleClaim : undefined}
+            disabled={!isConnected || isWritePending || isReceiptLoading}
             className={`w-full py-2 px-4 rounded font-medium text-sm transition-colors ${
-              isWritePending || isReceiptLoading
+              !isConnected
+                ? "bg-green-600 text-white cursor-not-allowed opacity-30"
+                : isWritePending || isReceiptLoading
                 ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                 : "bg-green-600 text-white hover:bg-green-700"
             }`}
