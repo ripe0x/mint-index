@@ -1,7 +1,7 @@
 import React, { useState } from "react";
 import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { Address, parseEther } from "viem";
-import { abiMintBounty } from "@/abi/abiMintBounty";
+import { abiMintBountyNew } from "@/abi/abiMintBountyNew";
 import { DEFAULT_TOKEN_CONTRACT } from "@/lib/bountyHelpers";
 import { TransactionStatus } from "./TransactionStatus";
 
@@ -47,7 +47,7 @@ export const BountyCreateForm: React.FC<BountyCreateFormProps> = ({
 
       await writeContract({
         address: bountyContractAddress,
-        abi: abiMintBounty,
+        abi: abiMintBountyNew,
         functionName: "createBounty",
         args: [
           formData.tokenContract as Address,

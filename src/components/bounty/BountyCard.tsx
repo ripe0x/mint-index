@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   useAccount,
   useReadContract,
@@ -6,11 +6,10 @@ import {
   useWaitForTransactionReceipt,
 } from "wagmi";
 import { Address } from "viem";
-import { abiMintBounty } from "@/abi/abiMintBounty";
+import { abiMintBountyNew } from "@/abi/abiMintBountyNew";
 import { abi1155 } from "@/abi/abi1155";
 import {
   formatETH,
-  getBountyStatusDisplay,
   shortenAddress,
   BountyStatus,
 } from "@/lib/bountyHelpers";
@@ -20,14 +19,17 @@ import { BountyTokenImage } from "./BountyTokenImage";
 
 interface BountyCardProps {
   bountyContract: Address;
-  tokenContract: Address;
+  tokenContract?: Address;
   isOwner?: boolean;
   onUpdate?: () => void;
 }
 
+const DEFAULT_TOKEN_CONTRACT =
+  "0xBA1901b542Aa58f181F7ae18eD6Cd79FdA779C62" as Address;
+
 export const BountyCard: React.FC<BountyCardProps> = ({
   bountyContract,
-  tokenContract,
+  tokenContract = DEFAULT_TOKEN_CONTRACT,
   isOwner,
   onUpdate,
 }) => {
@@ -39,7 +41,7 @@ export const BountyCard: React.FC<BountyCardProps> = ({
   // Read bounty details
   const { data: bountyData } = useReadContract({
     address: bountyContract,
-    abi: abiMintBounty,
+    abi: abiMintBountyNew,
     functionName: "bounties",
     args: [tokenContract],
   });
@@ -47,17 +49,55 @@ export const BountyCard: React.FC<BountyCardProps> = ({
   // Check if claimable
   const { data: isClaimable } = useReadContract({
     address: bountyContract,
-    abi: abiMintBounty,
+    abi: abiMintBountyNew,
     functionName: "isBountyClaimable",
     args: [tokenContract],
   });
 
-  // Read owner
+  // Read bounty contract owner
   const { data: owner } = useReadContract({
     address: bountyContract,
-    abi: abiMintBounty,
+    abi: abiMintBountyNew,
     functionName: "owner",
   });
+
+  // Read contract URI for metadata
+  const { data: contractUri } = useReadContract({
+    address: tokenContract,
+    abi: abi1155,
+    functionName: "contractURI",
+  });
+
+  // Read token contract owner
+  const { data: tokenOwner } = useReadContract({
+    address: tokenContract,
+    abi: abi1155,
+    functionName: "owner",
+  });
+
+  // State for contract metadata
+  const [contractMetadata, setContractMetadata] = useState<{
+    name?: string;
+    image?: string;
+    [key: string]: unknown;
+  } | null>(null);
+
+  // Fetch contract metadata
+  useEffect(() => {
+    async function fetchContractMetadata() {
+      if (!contractUri) return;
+
+      try {
+        const response = await fetch(contractUri as string);
+        const metadata = await response.json();
+        setContractMetadata(metadata);
+      } catch (error) {
+        console.error("Error fetching contract metadata:", error);
+      }
+    }
+
+    fetchContractMetadata();
+  }, [contractUri]);
 
   // Get latest token ID if lastMintedId is 0
   const { data: latestTokenId } = useReadContract(
@@ -97,7 +137,7 @@ export const BountyCard: React.FC<BountyCardProps> = ({
 
       await writeContract({
         address: bountyContract,
-        abi: abiMintBounty,
+        abi: abiMintBountyNew,
         functionName: "claimBounty",
         args: [tokenContract],
       });
@@ -122,141 +162,223 @@ export const BountyCard: React.FC<BountyCardProps> = ({
     }
   }, [writeError]);
 
+  const lastMintedId = bountyData?.[2] || BigInt(0); // lastMintedId
+
+  // Determine which token will be minted
+  // When lastMintedId is 0, it will mint copies of the latest token
+  // When lastMintedId > 0, it will mint lastMintedId + 1
+  const tokenToMint =
+    lastMintedId === BigInt(0)
+      ? latestTokenId
+        ? (latestTokenId as bigint)
+        : BigInt(1)
+      : lastMintedId + BigInt(1);
+
   if (!bountyData) return null;
 
   const status = getBountyStatus();
-  const statusDisplay = getBountyStatusDisplay(status);
 
-  const ownerArtifacts = Number(bountyData[3]) - Number(bountyData[4]);
+  const artifactsToMint = Number(bountyData?.[3] || 0); // artifactsToMint (total tokens)
+  const minterReward = Number(bountyData?.[4] || 0); // minterReward (tokens for claimer)
+  const balance = bountyData?.[6] || BigInt(0); // balance
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow">
+    <div className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow relative">
+      {/* Etherscan link positioned absolutely on desktop only */}
+      <a
+        href={`https://etherscan.io/address/${bountyContract}`}
+        target="_blank"
+        rel="noopener noreferrer"
+        className="hidden sm:block absolute top-4 right-4 text-xs text-blue-600 hover:underline"
+      >
+        View on Etherscan →
+      </a>
+
       <div className="flex gap-4">
-        {/* Token Image */}
-        <div className="flex-shrink-0">
+        {/* Token Image - hidden on mobile */}
+        <div className="flex-shrink-0 hidden sm:block">
           <BountyTokenImage
             tokenContract={tokenContract}
-            lastMintedId={bountyData[2]} // lastMintedId from bounty data
+            lastMintedId={lastMintedId || BigInt(0)}
+            contractMetadata={contractMetadata}
           />
         </div>
 
         {/* Content */}
         <div className="flex-1">
-          <div className="flex justify-between items-start mb-3">
-            <div>
-              <div className="flex items-center gap-2 mb-1">
-                <span className={`text-sm font-medium ${statusDisplay.color}`}>
-                  {statusDisplay.emoji} {statusDisplay.text}
-                </span>
-                {isOwner && (
-                  <span className="text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
-                    Your Contract
+          <div className="mb-3">
+            {/* Title: Bounty reward */}
+
+            <div className="mb-1 text-[16px] leading-snug">
+              {artifactsToMint}{" "}
+              <a
+                href={`https://networked.art/${tokenOwner}/${tokenContract.toLowerCase()}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:underline"
+              >
+                {contractMetadata?.name || "Token"}
+              </a>{" "}
+              by{" "}
+              <a
+                href={`https://networked.art/${tokenOwner}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:underline"
+              >
+                {tokenOwner ? (
+                  <EnsName address={tokenOwner} />
+                ) : (
+                  <span className="font-mono text-xs">
+                    {shortenAddress(tokenContract, 4)}
                   </span>
                 )}
-              </div>
-              <div className="flex items-center gap-2">
-                <span className="text-xs text-gray-500">Owner:</span>
-                <span className="text-xs font-medium">
-                  {owner === address ? (
-                    "You"
-                  ) : (
-                    <EnsName address={owner || "0x0"} />
-                  )}
-                </span>
-              </div>
+              </a>
             </div>
-            <a
-              href={`https://etherscan.io/address/${bountyContract}`}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="text-xs text-blue-600 hover:underline"
-            >
-              Etherscan →
-            </a>
+
+            {/* Owner */}
+            <div className="text-[12px] text-gray-600 mb-0">
+              Bounty reward: {minterReward} token
+              {(minterReward || 1) === 1 ? "" : "s"}{" "}
+              {/* {owner === address ? "You" : <EnsName address={owner || "0x0"} />}
+              {isOwner && (
+                <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
+                  Your Contract
+                </span>
+              )} */}
+            </div>
+
+            <div className="text-[12px] text-gray-600 mb-2">
+              Set by{" "}
+              {owner === address ? "You" : <EnsName address={owner || "0x0"} />}
+              {/* {isOwner && (
+                <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
+                  Your Contract
+                </span>
+              )} */}
+            </div>
+
+            {/* Token contract info */}
+            {/* <div className="text-xs text-gray-600">
+              On{" "}
+              <a
+                href={`https://networked.art/${tokenContract.toLowerCase()}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-blue-600 hover:underline"
+              >
+                {contractMetadata?.name || "Token"}
+              </a>{" "}
+              by{" "}
+              {tokenOwner ? (
+                <EnsName address={tokenOwner} />
+              ) : (
+                <span className="font-mono text-xs">
+                  {shortenAddress(tokenContract, 4)}
+                </span>
+              )}
+            </div> */}
+
+            {/* Status badge */}
+            {/* <div className="flex items-center gap-2 mt-2">
+              <span className={`text-sm font-medium ${statusDisplay.color}`}>
+                {statusDisplay.emoji} {statusDisplay.text}
+              </span>
+            </div> */}
           </div>
 
-          <div className="space-y-2 text-sm">
-            <div className="flex justify-between">
-              <span className="text-gray-600">Token:</span>
-              <span className="font-mono text-xs">
-                {shortenAddress(tokenContract, 6)}
+          {/* Secondary details - smaller and less prominent */}
+          <div className="space-y-0.5 text-[11px] text-gray-500 border-t pt-2 mt-2">
+            <div className="flex gap-4 md:flex-row flex-col">
+              {/* <span className="text-gray-400">
+                Tokens to mint: {artifactsToMint}
+              </span> */}
+              <span className="text-gray-400">
+                Bounty balance: {formatETH(balance)} ETH
               </span>
             </div>
-
-            <div className="flex justify-between">
-              <span className="text-gray-600">Recipient:</span>
-              <span className="text-xs">
-                {bountyData[0] === address ? (
-                  "You"
-                ) : (
-                  <EnsName address={bountyData[0]} />
-                )}
-              </span>
-            </div>
-
-            <div className="flex justify-between">
-              <span className="text-gray-600">Artifacts:</span>
-              <span>
-                {bountyData[3].toString()} total ({ownerArtifacts} owner,{" "}
-                {bountyData[4].toString()} claimer)
-              </span>
-            </div>
-
-            <div className="flex justify-between">
-              <span className="text-gray-600">Max Price:</span>
-              <span>{formatETH(bountyData[5])} ETH</span>
-            </div>
-
-            <div className="flex justify-between">
-              <span className="text-gray-600">Balance:</span>
-              <span className="font-medium">
-                {formatETH(bountyData[6])} ETH
-              </span>
-            </div>
-
-            <div className="flex justify-between">
-              <span className="text-gray-600">Next Token ID:</span>
-              <span>
-                #
-                {bountyData[2] === BigInt(0)
-                  ? latestTokenId
-                    ? latestTokenId.toString()
-                    : "Loading..."
-                  : (bountyData[2] + BigInt(1)).toString()}
-              </span>
+            <div className="text-gray-400">
+              Token #{tokenToMint.toString()} •{" "}
+              {shortenAddress(tokenContract, 6)}
             </div>
           </div>
         </div>
-      </div>
 
-      {status === "claimable" && !isOwner && (
-        <>
+        {/* Button column - hidden on mobile, shown on desktop */}
+        <div className="flex-shrink-0 items-center hidden sm:flex">
           {!isConnected ? (
-            <div className="w-full mt-4 py-2 px-4 rounded bg-gray-100 text-gray-600 text-sm text-center">
-              Connect wallet to claim {bountyData[4].toString()} NFT
-              {bountyData[4] === BigInt(1) ? "" : "s"}
+            <div className="py-2 px-4 rounded bg-gray-100 text-gray-600 text-sm text-center">
+              Connect wallet
             </div>
-          ) : (
+          ) : status === "claimable" && !isOwner ? (
             <button
               onClick={handleClaim}
               disabled={isWritePending || isReceiptLoading}
-              className={`w-full mt-4 py-2 px-4 rounded font-medium text-sm transition-colors ${
+              className={`py-2 px-4 rounded font-medium text-sm transition-colors ${
                 isWritePending || isReceiptLoading
                   ? "bg-gray-300 text-gray-500 cursor-not-allowed"
                   : "bg-green-600 text-white hover:bg-green-700"
               }`}
             >
               {isWritePending
-                ? "Confirm in wallet..."
+                ? "Confirm..."
                 : isReceiptLoading
-                ? "Claiming..."
-                : `Claim ${bountyData[4].toString()} NFT${
-                    bountyData[4] === BigInt(1) ? "" : "s"
-                  }`}
+                ? "Minting..."
+                : "Mint & Claim"}
+            </button>
+          ) : (
+            <button
+              disabled
+              className="py-2 px-4 rounded font-medium text-sm bg-gray-200 text-gray-500 cursor-not-allowed"
+            >
+              Claim Inactive
             </button>
           )}
-        </>
-      )}
+        </div>
+      </div>
+
+      {/* Button row for mobile - shown below content */}
+      <div className="sm:hidden mt-3 pt-3 border-t">
+        {!isConnected ? (
+          <button
+            className="w-full py-2 px-4 rounded bg-gray-100 text-gray-600 text-sm text-center"
+            disabled
+          >
+            Connect wallet
+          </button>
+        ) : status === "claimable" && !isOwner ? (
+          <button
+            onClick={handleClaim}
+            disabled={isWritePending || isReceiptLoading}
+            className={`w-full py-2 px-4 rounded font-medium text-sm transition-colors ${
+              isWritePending || isReceiptLoading
+                ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                : "bg-green-600 text-white hover:bg-green-700"
+            }`}
+          >
+            {isWritePending
+              ? "Confirm..."
+              : isReceiptLoading
+              ? "Minting..."
+              : "Mint & Claim"}
+          </button>
+        ) : (
+          <button
+            disabled
+            className="w-full py-2 px-4 rounded font-medium text-sm bg-gray-200 text-gray-500 cursor-not-allowed"
+          >
+            Bounty Claimed
+          </button>
+        )}
+        <a
+          href={`https://etherscan.io/address/${bountyContract}`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="block text-[11px] text-blue-600 hover:underline text-center mt-2"
+        >
+          View on Etherscan →
+        </a>
+      </div>
 
       <TransactionStatus
         status={txStatus}

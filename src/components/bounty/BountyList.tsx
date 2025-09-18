@@ -1,69 +1,22 @@
 import React, { useState, useEffect } from "react";
 import { useAccount } from "wagmi";
-import { Address } from "viem";
-import { fetchBountyFactoryEvents } from "@/lib/fetchBountyEvents";
-import { abiMintBounty } from "@/abi/abiMintBounty";
-import { DEFAULT_TOKEN_CONTRACT } from "@/lib/bountyHelpers";
+import { fetchAllBounties } from "@/lib/fetchBountyEvents";
+import { BountyData } from "@/types/bounty";
 import { BountyCard } from "./BountyCard";
-import { BountyManagement } from "./BountyManagement";
-import { client } from "@/config";
-
-interface BountyInfo {
-  bountyContract: Address;
-  owner: Address;
-  tokenContracts: Address[];
-}
-
-type FilterType = "all" | "claimable" | "owned";
 
 export const BountyList: React.FC = () => {
   const { address } = useAccount();
-  const [bounties, setBounties] = useState<BountyInfo[]>([]);
+  const [bounties, setBounties] = useState<BountyData[]>([]);
   const [loading, setLoading] = useState(true);
-  const [filter] = useState<FilterType>("all");
   const [refreshKey, setRefreshKey] = useState(0);
 
-  // Fetch all bounty contracts and their token contracts
   useEffect(() => {
     async function loadBounties() {
       setLoading(true);
       try {
-        // Get all deployed bounty contracts from factory events
-        const deployedContracts = await fetchBountyFactoryEvents();
-
-        // For each contract, fetch the actual owner if not provided
-        const bountyInfosPromises = deployedContracts.map(
-          async (deployment) => {
-            let owner = deployment.owner;
-
-            // If owner is zero address, fetch from contract
-            if (owner === "0x0000000000000000000000000000000000000000") {
-              try {
-                const ownerResult = await client.readContract({
-                  address: deployment.bountyContract,
-                  abi: abiMintBounty,
-                  functionName: "owner",
-                });
-                owner = ownerResult as Address;
-              } catch (err) {
-                console.error(
-                  "Error fetching owner for",
-                  deployment.bountyContract,
-                  err
-                );
-              }
-            }
-
-            return {
-              bountyContract: deployment.bountyContract,
-              owner,
-              tokenContracts: [DEFAULT_TOKEN_CONTRACT], // Default to the main token contract
-            };
-          }
-        );
-
-        const bountyInfos = await Promise.all(bountyInfosPromises);
-        setBounties(bountyInfos);
+        // Get all bounties (including inactive ones)
+        const allBounties = await fetchAllBounties(false);
+        setBounties(allBounties);
       } catch (error) {
         console.error("Error loading bounties:", error);
       } finally {
@@ -78,22 +31,10 @@ export const BountyList: React.FC = () => {
     setRefreshKey((prev) => prev + 1);
   };
 
-  const isOwned = (bounty: BountyInfo) => {
-    return address && bounty.owner.toLowerCase() === address.toLowerCase();
-  };
-
-  // Filter bounties based on selected filter
-  const filteredBounties = bounties.filter((bounty) => {
-    if (filter === "owned") {
-      return isOwned(bounty);
-    }
-    // For "claimable" filter, we'd need to check isBountyClaimable for each
-    // For now, showing all for "all" and "claimable"
-    return true;
-  });
-
-  // Sort bounties (simplified for now - would need to read contract data for full sorting)
-  const sortedBounties = [...filteredBounties];
+  const activeBounties = bounties.filter((b) => b.isActive && b.balance > 0n);
+  const inactiveBounties = bounties.filter(
+    (b) => !b.isActive || b.balance === 0n
+  );
 
   if (loading) {
     return (
@@ -109,76 +50,64 @@ export const BountyList: React.FC = () => {
 
   return (
     <div>
-      {/* Filters and Controls */}
-      {/* <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-        <div className="flex flex-wrap gap-2">
-          <select
-            value={filter}
-            onChange={(e) => setFilter(e.target.value as FilterType)}
-            className="px-3 py-2 border border-gray-300 rounded text-sm"
-          >
-            <option value="all">Show All</option>
-            <option value="claimable">Show Claimable</option>
-            <option value="owned">Show Owned</option>
-          </select>
-
-          <select
-            value={sort}
-            onChange={(e) => setSort(e.target.value as SortType)}
-            className="px-3 py-2 border border-gray-300 rounded text-sm"
-          >
-            <option value="recent">Most Recent</option>
-            <option value="balance">Highest Balance</option>
-            <option value="rewards">Most Rewards</option>
-          </select>
-        </div>
-
-        <button
+      <div className="flex justify-end mb-4">
+        {/* <button
           onClick={handleRefresh}
           className="px-4 py-2 border border-gray-300 rounded text-sm hover:bg-gray-50 transition-colors"
         >
           🔄 Refresh
-        </button>
-      </div> */}
+        </button> */}
+      </div>
 
-      {/* Bounty List */}
-      {sortedBounties.length === 0 ? (
-        <div className="text-center py-8 text-gray-500">
-          {filter === "owned"
-            ? "You don't own any bounty contracts yet."
-            : "No bounties found."}
+      {/* Active Bounties */}
+      {activeBounties.length > 0 && (
+        <div className="mb-8">
+          <h3 className="text-lg font-semibold mb-4">Active Bounties</h3>
+          <div className="space-y-4">
+            {activeBounties.map((bounty) => (
+              <BountyCard
+                key={`${bounty.bountyContract}-${bounty.tokenContract}`}
+                bountyContract={bounty.bountyContract}
+                tokenContract={bounty.tokenContract}
+                isOwner={
+                  address
+                    ? bounty.owner.toLowerCase() === address.toLowerCase()
+                    : false
+                }
+                onUpdate={handleRefresh}
+              />
+            ))}
+          </div>
         </div>
-      ) : (
-        <div className="space-y-6">
-          {sortedBounties.map((bounty) => (
-            <div key={bounty.bountyContract}>
-              {/* Show bounty cards for each token contract */}
-              {bounty.tokenContracts.map((tokenContract) => (
-                <div
-                  key={`${bounty.bountyContract}-${tokenContract}`}
-                  className="mb-4"
-                >
-                  <BountyCard
-                    bountyContract={bounty.bountyContract}
-                    tokenContract={tokenContract}
-                    isOwner={isOwned(bounty)}
-                    onUpdate={handleRefresh}
-                  />
+      )}
 
-                  {/* Show management controls for owned bounties */}
-                  {isOwned(bounty) && (
-                    <div className="mt-3 pl-4 border-l-4 border-blue-200">
-                      <BountyManagement
-                        bountyContract={bounty.bountyContract}
-                        tokenContract={tokenContract}
-                        onUpdate={handleRefresh}
-                      />
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          ))}
+      {/* Inactive/Claimed Bounties */}
+      {inactiveBounties.length > 0 && (
+        <div>
+          <h3 className="text-lg font-semibold mb-4 opacity-60">
+            Inactive / Claimed Bounties
+          </h3>
+          <div className="space-y-4 opacity-60">
+            {inactiveBounties.map((bounty) => (
+              <BountyCard
+                key={`${bounty.bountyContract}-${bounty.tokenContract}`}
+                bountyContract={bounty.bountyContract}
+                tokenContract={bounty.tokenContract}
+                isOwner={
+                  address
+                    ? bounty.owner.toLowerCase() === address.toLowerCase()
+                    : false
+                }
+                onUpdate={handleRefresh}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {bounties.length === 0 && (
+        <div className="text-center py-8 text-gray-500">
+          No bounties found. Deploy a bounty contract below to get started.
         </div>
       )}
     </div>

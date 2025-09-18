@@ -205,8 +205,15 @@ export default function BountyPage() {
               <li className="flex items-start">
                 <span className="mr-2">2.</span>
                 <span>
-                  Create bounties for any NFT collection, setting rewards and
-                  parameters
+                  Create bounties for contracts on the{" "}
+                  <a
+                    href="https://github.com/visualizevalue/mint"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                  >
+                    Mint protocol
+                  </a>
+                  , setting rewards and parameters
                 </span>
               </li>
               <li className="flex items-start">
@@ -239,7 +246,7 @@ export default function BountyPage() {
                   href="https://etherscan.io/address/0x1Bf79888027B7EeE2e5B30890DbfD9157EB4C06a"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="font-mono text-blue-600 hover:underline"
+                  className="font-mono text-xs sm:text-sm text-blue-600 hover:underline break-all"
                 >
                   0x1Bf79888027B7EeE2e5B30890DbfD9157EB4C06a
                 </a>
@@ -250,7 +257,7 @@ export default function BountyPage() {
                   href="https://etherscan.io/address/0xBA1901b542Aa58f181F7ae18eD6Cd79FdA779C62"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="font-mono text-blue-600 hover:underline"
+                  className="font-mono text-xs sm:text-sm text-blue-600 hover:underline break-all"
                 >
                   0xBA1901b542Aa58f181F7ae18eD6Cd79FdA779C62
                 </a>

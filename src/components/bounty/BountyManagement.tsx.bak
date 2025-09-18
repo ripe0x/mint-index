@@ -34,12 +34,12 @@ export const BountyManagement: React.FC<BountyManagementProps> = ({
   const [selectedArtifacts, setSelectedArtifacts] = useState<string[]>([]);
   const [artifactRecipient, setArtifactRecipient] = useState(address || "");
 
-  // Read bounty details
+  // Read bounty details - TODO: Need to update to use bountyId
   const { data: bountyData, refetch } = useReadContract({
     address: bountyContract,
     abi: abiMintBounty,
     functionName: "bounties",
-    args: [tokenContract],
+    args: [BigInt(0)], // TODO: Use actual bountyId
   });
 
   const {

@@ -10,6 +10,7 @@ import { CountdownTimer } from "@/components/CountdownTimer";
 import Head from "next/head";
 import DisplayName from "@/components/DisplayName";
 import { FACTORY_ADDRESS, FACTORY_DEPLOYMENT_BLOCK } from "@/lib/constants";
+import { BountySection } from "@/components/bounty/BountySection";
 
 const getDisplayContent = (
   metadata: TokenMetadata | null,
@@ -345,6 +346,13 @@ export default function TokenPage() {
                 tokenId={Number(tokenId)}
               />
             )}
+
+            {/* Bounty Section */}
+            <BountySection
+              tokenContract={contractAddress}
+              tokenId={Number(tokenId)}
+            />
+
             <hr className="my-4" />
             <div className="mt-4">
               <div className="space-y-3">

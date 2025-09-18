@@ -6,19 +6,31 @@ import { abi1155 } from "@/abi/abi1155";
 interface BountyTokenImageProps {
   tokenContract: Address;
   lastMintedId: bigint;
+  contractMetadata?: {
+    name?: string;
+    image?: string;
+    [key: string]: unknown;
+  } | null;
+  className?: string;
 }
 
 export const BountyTokenImage: React.FC<BountyTokenImageProps> = ({
   tokenContract,
   lastMintedId,
+  contractMetadata,
+  className = "w-16 h-16 rounded object-cover",
 }) => {
-  const [tokenId, setTokenId] = useState<bigint>(0n);
   const [imageUrl, setImageUrl] = useState<string>("");
   const [loading, setLoading] = useState(true);
 
-  // Get latest token ID if lastMintedId is 0
+  // Determine the token ID to display
+  // If lastMintedId > 0, show the next token (lastMintedId + 1)
+  // If lastMintedId == 0, show the latest token (which will be minted)
+  const shouldFetchLatest = lastMintedId === 0n;
+
+  // Get latest token ID if needed
   const { data: latestTokenId } = useReadContract(
-    lastMintedId === 0n
+    shouldFetchLatest
       ? {
           address: tokenContract,
           abi: abi1155,
@@ -27,101 +39,109 @@ export const BountyTokenImage: React.FC<BountyTokenImageProps> = ({
       : undefined
   );
 
-  // Determine which token ID to use
-  useEffect(() => {
-    if (lastMintedId === 0n && latestTokenId) {
-      setTokenId(latestTokenId as bigint);
-    } else if (lastMintedId > 0n) {
-      // Next token to mint is lastMintedId + 1
-      setTokenId(lastMintedId + 1n);
-    }
-  }, [lastMintedId, latestTokenId]);
+  // The actual token ID to use for fetching metadata
+  // When lastMintedId is 0, show the latest token (bounty will mint copies of it)
+  // When lastMintedId > 0, show the next token that will be minted
+  const tokenIdToUse = shouldFetchLatest
+    ? (latestTokenId as bigint || 0n)
+    : lastMintedId + 1n;
 
   // Fetch token URI
   const { data: tokenUri } = useReadContract(
-    tokenId > 0n
+    tokenIdToUse > 0n
       ? {
           address: tokenContract,
           abi: abi1155,
           functionName: "uri",
-          args: [tokenId],
+          args: [tokenIdToUse],
         }
       : undefined
   );
 
+
   // Fetch and process token metadata
   useEffect(() => {
     async function fetchMetadata() {
-      if (!tokenUri) {
+      if (!tokenUri || tokenIdToUse === 0n) {
         setLoading(false);
+        setImageUrl("");
         return;
       }
 
       try {
-        // Handle IPFS URIs
-        let metadataUrl = tokenUri as string;
-        if (metadataUrl.startsWith("ipfs://")) {
-          metadataUrl = metadataUrl.replace("ipfs://", "https://ipfs.io/ipfs/");
-        }
+        // Fetch metadata from tokenUri
+        const response = await fetch(tokenUri as string);
+        const metadata = await response.json();
 
-        // Handle on-chain base64 encoded data
-        if (metadataUrl.startsWith("data:application/json;base64,")) {
-          const base64Data = metadataUrl.split(",")[1];
-          const jsonString = atob(base64Data);
-          const metadata = JSON.parse(jsonString);
-
-          if (metadata.image) {
-            let imageUri = metadata.image;
-            if (imageUri.startsWith("ipfs://")) {
-              imageUri = imageUri.replace("ipfs://", "https://ipfs.io/ipfs/");
-            }
-            setImageUrl(imageUri);
+        if (metadata.image) {
+          let imageUri = metadata.image;
+          // Handle IPFS URIs
+          if (imageUri.startsWith("ipfs://")) {
+            imageUri = `https://ipfs.io/ipfs/${imageUri.slice(7)}`;
           }
+          setImageUrl(imageUri);
         } else {
-          // Fetch external metadata
-          const response = await fetch(metadataUrl);
-          const metadata = await response.json();
-
-          if (metadata.image) {
-            let imageUri = metadata.image;
-            if (imageUri.startsWith("ipfs://")) {
-              imageUri = imageUri.replace("ipfs://", "https://ipfs.io/ipfs/");
-            }
-            setImageUrl(imageUri);
-          }
+          setImageUrl("");
         }
       } catch (error) {
         console.error("Error fetching token metadata:", error);
+        setImageUrl("");
       } finally {
         setLoading(false);
       }
     }
 
     fetchMetadata();
-  }, [tokenUri]);
+  }, [tokenUri, tokenIdToUse]);
 
   if (loading) {
     return (
-      <div className="w-16 h-16 bg-gray-200 rounded animate-pulse"></div>
+      <div className={`bg-gray-200 animate-pulse ${className}`}></div>
     );
   }
 
-  if (!imageUrl) {
+  // Determine which image to show
+  const displayImage = imageUrl || contractMetadata?.image;
+
+  // Process IPFS URLs if needed
+  const processImageUrl = (url: string) => {
+    if (url?.startsWith("ipfs://")) {
+      return `https://ipfs.io/ipfs/${url.slice(7)}`;
+    }
+    return url;
+  };
+
+  // Show placeholder if no token ID and no images available
+  if (tokenIdToUse === 0n && !displayImage) {
     return (
-      <div className="w-16 h-16 bg-gray-100 rounded flex items-center justify-center">
-        <span className="text-xs text-gray-400">No image</span>
+      <div className={`bg-gray-100 flex items-center justify-center ${className}`}>
+        <span className="text-[10px] text-gray-400 text-center">
+          No token yet
+        </span>
       </div>
     );
   }
 
+  // Show image (either token image or contract image as fallback)
+  if (displayImage) {
+    return (
+      <img
+        src={processImageUrl(displayImage)}
+        alt={imageUrl ? `Token #${tokenIdToUse}` : "Contract"}
+        className={className}
+        onError={(e) => {
+          e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' fill='%23ddd'%3E%3Crect width='64' height='64' /%3E%3C/svg%3E";
+        }}
+      />
+    );
+  }
+
+  // Fallback placeholder
   return (
-    <img
-      src={imageUrl}
-      alt={`Token #${tokenId}`}
-      className="w-16 h-16 object-cover rounded"
-      onError={(e) => {
-        e.currentTarget.src = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='64' height='64' fill='%23ddd'%3E%3Crect width='64' height='64' /%3E%3C/svg%3E";
-      }}
-    />
+    <div className={`bg-gray-100 flex items-center justify-center ${className}`}>
+      <span className="text-[10px] text-gray-400 text-center">
+        No image
+      </span>
+    </div>
   );
 };
