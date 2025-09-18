@@ -1,8 +1,5 @@
 import React, { useState } from "react";
-import {
-  useWriteContract,
-  useWaitForTransactionReceipt,
-} from "wagmi";
+import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { Address } from "viem";
 import { abiMintBountyNew } from "@/abi/abiMintBountyNew";
 
@@ -48,7 +45,8 @@ export const BountyClaimButton: React.FC<BountyClaimButtonProps> = ({
   // Check if claimable - need to check if balance covers both minting cost and gas refund
   // The actual minting cost would need to be fetched from the contract, but we can estimate
   // For now, check if balance is sufficient for at least the gas refund amount
-  const isClaimable = isActive &&
+  const isClaimable =
+    isActive &&
     balance > 0n &&
     balance >= gasRefundAmount &&
     (maxClaims === 0 || claimedCount < maxClaims);
@@ -91,7 +89,7 @@ export const BountyClaimButton: React.FC<BountyClaimButtonProps> = ({
     if (isReceiptLoading) return "Minting...";
     if (txStatus === "success") return "Success!";
     if (!isClaimable || !isActive) {
-      return "Claim Inactive";
+      return "Claimed";
     }
     return "Mint & Claim";
   };
@@ -101,7 +99,13 @@ export const BountyClaimButton: React.FC<BountyClaimButtonProps> = ({
       ? "px-3 py-1 text-[11px] rounded font-medium transition-colors"
       : "py-2 px-4 rounded font-medium text-sm transition-colors";
 
-    if (disabled || !isClaimable || !isActive || isWritePending || isReceiptLoading) {
+    if (
+      disabled ||
+      !isClaimable ||
+      !isActive ||
+      isWritePending ||
+      isReceiptLoading
+    ) {
       return `${base} bg-gray-200 text-gray-500 cursor-not-allowed`;
     }
 
@@ -120,7 +124,13 @@ export const BountyClaimButton: React.FC<BountyClaimButtonProps> = ({
     <>
       <button
         onClick={handleClaim}
-        disabled={disabled || !isClaimable || !isActive || isWritePending || isReceiptLoading}
+        disabled={
+          disabled ||
+          !isClaimable ||
+          !isActive ||
+          isWritePending ||
+          isReceiptLoading
+        }
         className={buttonClasses()}
       >
         {buttonText()}
@@ -128,7 +138,7 @@ export const BountyClaimButton: React.FC<BountyClaimButtonProps> = ({
 
       {txStatus === "error" && writeError && (
         <div className="text-[10px] text-red-600 mt-1">
-          {writeError.message.split('\n')[0]}
+          {writeError.message.split("\n")[0]}
         </div>
       )}
 

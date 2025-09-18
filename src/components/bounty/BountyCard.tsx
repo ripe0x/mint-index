@@ -8,11 +8,7 @@ import {
 import { Address } from "viem";
 import { abiMintBountyNew } from "@/abi/abiMintBountyNew";
 import { abi1155 } from "@/abi/abi1155";
-import {
-  formatETH,
-  shortenAddress,
-  BountyStatus,
-} from "@/lib/bountyHelpers";
+import { formatETH, shortenAddress, BountyStatus } from "@/lib/bountyHelpers";
 import { TransactionStatus } from "./TransactionStatus";
 import { EnsName } from "./EnsName";
 import { BountyTokenImage } from "./BountyTokenImage";
@@ -331,7 +327,7 @@ export const BountyCard: React.FC<BountyCardProps> = ({
               disabled
               className="py-2 px-4 rounded font-medium text-sm bg-gray-200 text-gray-500 cursor-not-allowed"
             >
-              Claim Inactive
+              Claimed
             </button>
           )}
         </div>
