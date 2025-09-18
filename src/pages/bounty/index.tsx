@@ -63,7 +63,7 @@ export default function BountyPage() {
         <title>MintBounty - Manage Bounty Contracts</title>
         <meta
           name="description"
-          content="Deploy and manage MintBounty contracts on Mint Protocol"
+          content="Deploy & manage MintBounty contracts on Mint Protocol"
         />
       </Head>
 
