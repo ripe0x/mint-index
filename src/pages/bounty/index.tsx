@@ -73,8 +73,14 @@ export default function BountyPage() {
           <div className="mb-8">
             <h1 className="text-3xl font-bold mb-2">MintBounty</h1>
             <p className="text-gray-600">
-              Deploy, manage, and claim bounties for NFT minting on Ethereum
-              mainnet
+              Deploy, manage, and claim bounties for NFT minting on{" "}
+              <a
+                href="https://networked.art/"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                Mint Protocol
+              </a>
             </p>
           </div>
 
@@ -103,7 +109,6 @@ export default function BountyPage() {
 
               {/* All Bounties Section - Always visible */}
               <div className="mb-8">
-                <h2 className="text-2xl font-bold mb-4">All Active Bounties</h2>
                 <BountyList />
               </div>
 
