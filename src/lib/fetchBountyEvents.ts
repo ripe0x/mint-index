@@ -3,7 +3,8 @@ import { Address, parseAbiItem } from "viem";
 import { abiMintBountyNew } from "@/abi/abiMintBountyNew";
 import { BountyData } from "@/types/bounty";
 
-const FACTORY_ADDRESS = "0x1Bf79888027B7EeE2e5B30890DbfD9157EB4C06a";
+const BOUNTY_FACTORY_ADDRESS = "0x1Bf79888027B7EeE2e5B30890DbfD9157EB4C06a";
+const TOKEN_FACTORY_ADDRESS = "0xd717Fe677072807057B03705227EC3E3b467b670";
 
 export interface BountyContractDeployed {
   owner: Address;
@@ -16,14 +17,12 @@ export async function fetchBountyFactoryEvents(
   ownerFilter?: Address
 ): Promise<BountyContractDeployed[]> {
   try {
-    // Try multiple block ranges to find events
+    // Start from block 21385383 as specified
     const blockRanges = [
-      { from: 21400000n, to: "latest" as const },  // Recent blocks
-      { from: 21200000n, to: 21400000n },  // Earlier range
-      { from: 21000000n, to: 21200000n },  // Even earlier
+      { from: 21385383n, to: "latest" as const },  // From the specified starting block
     ];
 
-    console.log("Fetching bounty events from factory:", FACTORY_ADDRESS);
+    console.log("Fetching bounty events from factory:", BOUNTY_FACTORY_ADDRESS);
     console.log("Owner filter:", ownerFilter);
 
     const allLogs: Array<{
@@ -36,9 +35,9 @@ export async function fetchBountyFactoryEvents(
 
     for (const range of blockRanges) {
       try {
-        console.log(`Checking range ${range.from}-${range.to} for factory ${FACTORY_ADDRESS}`);
+        console.log(`Checking range ${range.from}-${range.to} for factory ${BOUNTY_FACTORY_ADDRESS}`);
         const logs = await client.getLogs({
-          address: FACTORY_ADDRESS as Address,
+          address: BOUNTY_FACTORY_ADDRESS as Address,
           event: parseAbiItem('event BountyContractDeployed(address indexed owner, address indexed bountyContract)'),
           fromBlock: range.from,
           toBlock: range.to,
@@ -104,7 +103,30 @@ export async function fetchAllActiveBounties(): Promise<BountyData[]> {
   return fetchAllBounties(true);
 }
 
-const DEFAULT_TOKEN_CONTRACT = "0xBA1901b542Aa58f181F7ae18eD6Cd79FdA779C62" as Address;
+// Fetch all token contracts deployed from the Mint token factory
+async function fetchAllTokenContracts(): Promise<Address[]> {
+  try {
+    console.log("Fetching all token contracts from factory:", TOKEN_FACTORY_ADDRESS);
+
+    // The Mint factory emits Created events when new token contracts are deployed
+    const logs = await client.getLogs({
+      address: TOKEN_FACTORY_ADDRESS as Address,
+      event: parseAbiItem('event Created(address indexed ownerAddress, address contractAddress)'),
+      fromBlock: 21385383n,
+      toBlock: "latest",
+    });
+
+    const tokenContracts = logs
+      .map(log => log.args?.contractAddress)
+      .filter((addr): addr is Address => !!addr);
+
+    console.log(`Found ${tokenContracts.length} token contracts from factory`);
+    return tokenContracts;
+  } catch (error) {
+    console.error("Error fetching token contracts from factory:", error);
+    return [];
+  }
+}
 
 export async function fetchAllBounties(activeOnly: boolean = false): Promise<BountyData[]> {
   try {
@@ -116,50 +138,64 @@ export async function fetchAllBounties(activeOnly: boolean = false): Promise<Bou
       return [];
     }
 
-    // For each contract, fetch the bounty for DEFAULT_TOKEN_CONTRACT
-    const allBountiesPromises = deployedContracts.map(async (deployment) => {
-      try {
-        // Read bounty data for DEFAULT_TOKEN_CONTRACT
-        const bountyData = await client.readContract({
-          address: deployment.bountyContract,
-          abi: abiMintBountyNew,
-          functionName: "bounties",
-          args: [DEFAULT_TOKEN_CONTRACT],
-        });
+    // Get all token contracts from the Mint factory
+    const allTokenContracts = await fetchAllTokenContracts();
 
-        console.log(`Bounty data for ${deployment.bountyContract}:`, bountyData);
+    // We'll check all token contracts from the factory
+    // This ensures we don't miss any bounties
+    const tokenContracts = new Set<Address>(allTokenContracts);
 
-        // Only include if there's actually a bounty (recipient is not zero address)
-        if (bountyData && bountyData[0] !== "0x0000000000000000000000000000000000000000") {
-          const isActive = !bountyData[1]; // !paused
-          const hasBalance = bountyData[6] > 0n; // balance > 0
+    // Also add some known contracts in case factory fetch fails
+    tokenContracts.add("0xBA1901b542Aa58f181F7ae18eD6Cd79FdA779C62" as Address);
+    tokenContracts.add("0xb437c5228d75A0769E2318Cf5E0Aa893058966CA" as Address);
 
-          // Filter by active status if requested
-          if (activeOnly && (!isActive || !hasBalance)) {
-            return null;
+    console.log(`Checking ${tokenContracts.size} unique token contracts with ${deployedContracts.length} bounty contracts`);
+    console.log("Token contracts:", Array.from(tokenContracts));
+
+    // Now check each combination of bounty contract + token contract
+    const allBountiesPromises = deployedContracts.flatMap(deployment =>
+      Array.from(tokenContracts).map(async (tokenContract) => {
+        try {
+          // Read bounty data for this token contract
+          const bountyData = await client.readContract({
+            address: deployment.bountyContract,
+            abi: abiMintBountyNew,
+            functionName: "bounties",
+            args: [tokenContract],
+          });
+
+          // Only include if there's actually a bounty (recipient is not zero address)
+          if (bountyData && bountyData[0] !== "0x0000000000000000000000000000000000000000") {
+            const isActive = !bountyData[1]; // !paused
+            const hasBalance = bountyData[6] > 0n; // balance > 0
+
+            // Filter by active status if requested
+            if (activeOnly && (!isActive || !hasBalance)) {
+              return null;
+            }
+
+            return {
+              bountyContract: deployment.bountyContract,
+              bountyId: 0, // Using 0 since these contracts use tokenContract as key
+              tokenContract: tokenContract,
+              lastMintedId: Number(bountyData[2]), // lastMintedId
+              gasRefundAmount: bountyData[4], // minterReward (number of tokens for claimer)
+              claimedCount: 0, // We don't have a direct way to get claimed count from this contract
+              maxClaims: Number(bountyData[3]), // artifactsToMint (total tokens to mint)
+              isActive: isActive,
+              balance: bountyData[6], // balance
+              createdAt: 0, // not available in this contract
+              gasRefundRecipient: bountyData[0], // recipient
+              owner: deployment.owner,
+            } as BountyData;
           }
-
-          return {
-            bountyContract: deployment.bountyContract,
-            bountyId: 0, // Using 0 since these contracts use tokenContract as key
-            tokenContract: DEFAULT_TOKEN_CONTRACT,
-            lastMintedId: Number(bountyData[2]), // lastMintedId
-            gasRefundAmount: bountyData[4], // minterReward (number of tokens for claimer)
-            claimedCount: 0, // We don't have a direct way to get claimed count from this contract
-            maxClaims: Number(bountyData[3]), // artifactsToMint (total tokens to mint)
-            isActive: isActive,
-            balance: bountyData[6], // balance
-            createdAt: 0, // not available in this contract
-            gasRefundRecipient: bountyData[0], // recipient
-            owner: deployment.owner,
-          } as BountyData;
+          return null;
+        } catch (err) {
+          console.log(`Error fetching bounty from ${deployment.bountyContract} for token ${tokenContract}:`, err);
+          return null;
         }
-        return null;
-      } catch (err) {
-        console.log(`Error fetching bounty from ${deployment.bountyContract}:`, err);
-        return null;
-      }
-    });
+      })
+    );
 
     const allBounties = await Promise.all(allBountiesPromises);
     return allBounties.filter((b): b is BountyData => b !== null);

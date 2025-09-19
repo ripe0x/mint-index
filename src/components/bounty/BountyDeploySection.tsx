@@ -1,5 +1,9 @@
 import React, { useState } from "react";
-import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import {
+  useAccount,
+  useWriteContract,
+  useWaitForTransactionReceipt,
+} from "wagmi";
 import { abiBountyFactory } from "@/abi/abiBountyFactory";
 import { FACTORY_ADDRESS } from "@/lib/bountyHelpers";
 import { TransactionStatus } from "./TransactionStatus";
@@ -13,7 +17,9 @@ export const BountyDeploySection: React.FC<BountyDeploySectionProps> = ({
   onDeploySuccess,
 }) => {
   const { isConnected } = useAccount();
-  const [txStatus, setTxStatus] = useState<"idle" | "confirming" | "processing" | "success" | "error">("idle");
+  const [txStatus, setTxStatus] = useState<
+    "idle" | "confirming" | "processing" | "success" | "error"
+  >("idle");
 
   const {
     writeContract,
@@ -22,9 +28,10 @@ export const BountyDeploySection: React.FC<BountyDeploySectionProps> = ({
     isPending: isWritePending,
   } = useWriteContract();
 
-  const { data: receipt, isLoading: isReceiptLoading } = useWaitForTransactionReceipt({
-    hash,
-  });
+  const { data: receipt, isLoading: isReceiptLoading } =
+    useWaitForTransactionReceipt({
+      hash,
+    });
 
   const handleDeploy = async () => {
     try {
@@ -54,7 +61,10 @@ export const BountyDeploySection: React.FC<BountyDeploySectionProps> = ({
 
       if (deployedEvent && onDeploySuccess) {
         // The contract address is in the event data
-        const contractAddress = `0x${deployedEvent.data.slice(26, 66)}` as Address;
+        const contractAddress = `0x${deployedEvent.data.slice(
+          26,
+          66
+        )}` as Address;
         onDeploySuccess(contractAddress);
       }
     } else if (receipt?.status === "reverted") {
@@ -72,15 +82,15 @@ export const BountyDeploySection: React.FC<BountyDeploySectionProps> = ({
     return (
       <div className="bg-gray-100 border border-gray-300 rounded-lg p-8 text-center">
         <h2 className="text-xl font-bold mb-4">Deploy Your Bounty Contract</h2>
-        <p className="text-gray-600 mb-4">Connect your wallet to deploy a MintBounty contract</p>
+        <p className="text-gray-600 mb-4">
+          Connect your wallet to deploy a MintBounty contract
+        </p>
       </div>
     );
   }
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-6">
-      <h2 className="text-xl font-bold mb-4">Deploy Your Own Bounty Contract</h2>
-
       <div className="space-y-3 mb-6">
         <p className="text-sm text-gray-600">
           Deploy your own MintBounty contract for ~67k gas ($9 at 30 gwei)
@@ -95,7 +105,9 @@ export const BountyDeploySection: React.FC<BountyDeploySectionProps> = ({
 
       <button
         onClick={handleDeploy}
-        disabled={isWritePending || isReceiptLoading || txStatus === "processing"}
+        disabled={
+          isWritePending || isReceiptLoading || txStatus === "processing"
+        }
         className={`w-full py-3 px-4 rounded font-medium transition-colors ${
           isWritePending || isReceiptLoading || txStatus === "processing"
             ? "bg-gray-300 text-gray-500 cursor-not-allowed"
