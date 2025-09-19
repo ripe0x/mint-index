@@ -78,6 +78,7 @@ export default function BountyPage() {
                 href="https://networked.art/"
                 target="_blank"
                 rel="noopener noreferrer"
+                className="underline hover:no-underline"
               >
                 Mint Protocol
               </a>
