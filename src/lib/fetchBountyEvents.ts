@@ -104,7 +104,7 @@ export async function fetchAllActiveBounties(): Promise<BountyData[]> {
 }
 
 // Fetch all token contracts deployed from the Mint token factory
-async function fetchAllTokenContracts(): Promise<Address[]> {
+export async function fetchAllTokenContracts(): Promise<Address[]> {
   try {
     console.log("Fetching all token contracts from factory:", TOKEN_FACTORY_ADDRESS);
 

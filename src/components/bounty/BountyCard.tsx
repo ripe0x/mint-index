@@ -12,6 +12,7 @@ import { formatETH, shortenAddress, BountyStatus } from "@/lib/bountyHelpers";
 import { TransactionStatus } from "./TransactionStatus";
 import { EnsName } from "./EnsName";
 import { BountyTokenImage } from "./BountyTokenImage";
+import { BountyManagement } from "./BountyManagement";
 
 interface BountyCardProps {
   bountyContract: Address;
@@ -33,6 +34,7 @@ export const BountyCard: React.FC<BountyCardProps> = ({
   const [txStatus, setTxStatus] = useState<
     "idle" | "confirming" | "processing" | "success" | "error"
   >("idle");
+  const [showManagement, setShowManagement] = useState(false);
 
   // Read bounty details
   const { data: bountyData } = useReadContract({
@@ -375,6 +377,29 @@ export const BountyCard: React.FC<BountyCardProps> = ({
         error={writeError?.message}
         successMessage="Bounty claimed successfully!"
       />
+
+      {/* Management Section for Owners */}
+      {isOwner && (
+        <div className="mt-3 pt-3 border-t">
+          <button
+            onClick={() => setShowManagement(!showManagement)}
+            className="text-sm text-blue-600 hover:underline"
+          >
+            {showManagement ? "Hide Management" : "Manage Bounty"}
+          </button>
+        </div>
+      )}
+
+      {/* Management Modal/Panel */}
+      {showManagement && isOwner && (
+        <div className="mt-4">
+          <BountyManagement
+            bountyContract={bountyContract}
+            tokenContract={tokenContract}
+            onUpdate={onUpdate}
+          />
+        </div>
+      )}
     </div>
   );
 };
