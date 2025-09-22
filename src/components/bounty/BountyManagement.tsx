@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useAccount, useReadContract, useWriteContract, useWaitForTransactionReceipt, useBalance } from "wagmi";
 import { Address, parseEther, formatEther } from "viem";
 import { abiMintBountyNew } from "@/abi/abiMintBountyNew";
 import { abi1155 } from "@/abi/abi1155";
@@ -19,6 +19,7 @@ export const BountyManagement: React.FC<BountyManagementProps> = ({
   onUpdate,
 }) => {
   const { address } = useAccount();
+  const { data: walletBalance } = useBalance({ address });
   const [activeModal, setActiveModal] = useState<"update" | "fund" | "withdraw" | "artifacts" | null>(null);
   const [txStatus, setTxStatus] = useState<"idle" | "confirming" | "processing" | "success" | "error">("idle");
   const [nftCount, setNftCount] = useState(0);
@@ -34,8 +35,8 @@ export const BountyManagement: React.FC<BountyManagementProps> = ({
     maxArtifactPrice: "0.001",
   });
 
-  const [fundAmount, setFundAmount] = useState("0.1");
-  const [withdrawAmount, setWithdrawAmount] = useState("0.1");
+  const [fundAmount, setFundAmount] = useState("0.01");
+  const [withdrawAmount, setWithdrawAmount] = useState("");
 
   // Read bounty details using tokenContract as key
   const { data: bountyData, refetch } = useReadContract({
@@ -162,6 +163,7 @@ export const BountyManagement: React.FC<BountyManagementProps> = ({
 
       // Only check the primary token contract associated with this bounty
       const tokenIds: bigint[] = [];
+      const tokenBalances = new Map<bigint, bigint>(); // Track balance for each token ID
 
       // Get the lastMintedId from bounty data to know the range
       const lastMintedId = bountyData[2] || BigInt(0);
@@ -179,11 +181,11 @@ export const BountyManagement: React.FC<BountyManagementProps> = ({
           });
 
           if (balance && balance > 0n) {
-            // Add the token ID for each unit held
-            for (let i = 0; i < Number(balance); i++) {
-              tokenIds.push(BigInt(id));
-              totalCount++;
-            }
+            tokenBalances.set(BigInt(id), balance);
+            // For withdrawArtifacts, we need to specify each token ID we want to withdraw
+            // If a token has balance > 1, we still only list it once in tokenIds
+            tokenIds.push(BigInt(id));
+            totalCount += Number(balance);
           }
         } catch {
           // Token ID doesn't exist, continue
@@ -195,6 +197,7 @@ export const BountyManagement: React.FC<BountyManagementProps> = ({
       }
 
       console.log("Found NFTs:", totalCount, "for token contract:", tokenContract);
+      console.log("Token balances:", Array.from(tokenBalances.entries()).map(([id, bal]) => `#${id}: ${bal}`).join(", "));
       setNftsToWithdraw(withdrawableNFTs);
       setNftCount(totalCount);
     } catch (error) {
@@ -252,27 +255,27 @@ export const BountyManagement: React.FC<BountyManagementProps> = ({
       <div className="flex flex-wrap gap-2">
         <button
           onClick={() => setActiveModal("update")}
-          className="px-4 py-2 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors"
+          className="px-4 py-2 bg-blue-600 text-white text-sm hover:bg-blue-700 transition-colors"
         >
           Update Bounty
         </button>
         <button
           onClick={() => setActiveModal("fund")}
-          className="px-4 py-2 bg-green-600 text-white rounded text-sm hover:bg-green-700 transition-colors"
+          className="px-4 py-2 bg-green-600 text-white text-sm hover:bg-green-700 transition-colors"
         >
           Fund Bounty
         </button>
         <button
           onClick={() => setActiveModal("withdraw")}
-          className="px-4 py-2 bg-orange-600 text-white rounded text-sm hover:bg-orange-700 transition-colors"
+          className="px-4 py-2 bg-orange-600 text-white text-sm hover:bg-orange-700 transition-colors"
         >
           Withdraw ETH
         </button>
         <button
           onClick={() => setActiveModal("artifacts")}
-          className="px-4 py-2 bg-purple-600 text-white rounded text-sm hover:bg-purple-700 transition-colors"
+          className="px-4 py-2 bg-purple-600 text-white text-sm hover:bg-purple-700 transition-colors"
         >
-          Withdraw NFTs
+          Withdraw Artifacts
         </button>
       </div>
 
@@ -280,7 +283,7 @@ export const BountyManagement: React.FC<BountyManagementProps> = ({
       {activeModal === "update" && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <h3 className="text-lg font-bold mb-4">Update Bounty</h3>
+            <h3 className="text-lg font-bold mb-2">Update Bounty</h3>
 
             <div className="space-y-3">
               <div>
@@ -289,7 +292,7 @@ export const BountyManagement: React.FC<BountyManagementProps> = ({
                   type="text"
                   value={updateForm.recipient}
                   onChange={(e) => setUpdateForm({ ...updateForm, recipient: e.target.value })}
-                  className="w-full px-3 py-2 border rounded text-sm font-mono"
+                  className="w-full px-3 py-2 border text-sm font-mono"
                 />
               </div>
 
@@ -298,7 +301,7 @@ export const BountyManagement: React.FC<BountyManagementProps> = ({
                 <select
                   value={updateForm.paused ? "paused" : "active"}
                   onChange={(e) => setUpdateForm({ ...updateForm, paused: e.target.value === "paused" })}
-                  className="w-full px-3 py-2 border rounded text-sm"
+                  className="w-full px-3 py-2 border text-sm"
                 >
                   <option value="active">Active</option>
                   <option value="paused">Paused</option>
@@ -313,7 +316,7 @@ export const BountyManagement: React.FC<BountyManagementProps> = ({
                     min="1"
                     value={updateForm.artifactsToMint}
                     onChange={(e) => setUpdateForm({ ...updateForm, artifactsToMint: e.target.value })}
-                    className="w-full px-3 py-2 border rounded text-sm"
+                    className="w-full px-3 py-2 border text-sm"
                   />
                 </div>
 
@@ -324,7 +327,7 @@ export const BountyManagement: React.FC<BountyManagementProps> = ({
                     min="0"
                     value={updateForm.minterReward}
                     onChange={(e) => setUpdateForm({ ...updateForm, minterReward: e.target.value })}
-                    className="w-full px-3 py-2 border rounded text-sm"
+                    className="w-full px-3 py-2 border text-sm"
                   />
                 </div>
               </div>
@@ -337,7 +340,7 @@ export const BountyManagement: React.FC<BountyManagementProps> = ({
                   min="0"
                   value={updateForm.maxArtifactPrice}
                   onChange={(e) => setUpdateForm({ ...updateForm, maxArtifactPrice: e.target.value })}
-                  className="w-full px-3 py-2 border rounded text-sm"
+                  className="w-full px-3 py-2 border text-sm"
                 />
               </div>
             </div>
@@ -346,13 +349,13 @@ export const BountyManagement: React.FC<BountyManagementProps> = ({
               <button
                 onClick={handleUpdate}
                 disabled={isWritePending || isReceiptLoading}
-                className="flex-1 py-2 bg-blue-600 text-white rounded hover:bg-blue-700 disabled:bg-gray-300"
+                className="flex-1 py-1.5 text-sm bg-blue-600 text-white hover:bg-blue-700 disabled:bg-gray-300"
               >
                 {isWritePending ? "Confirming..." : isReceiptLoading ? "Updating..." : "Update"}
               </button>
               <button
                 onClick={() => { setActiveModal(null); setTxStatus("idle"); }}
-                className="flex-1 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                className="flex-1 py-1.5 text-sm bg-gray-200 text-gray-700 hover:bg-gray-300"
               >
                 Cancel
               </button>
@@ -367,20 +370,23 @@ export const BountyManagement: React.FC<BountyManagementProps> = ({
       {activeModal === "fund" && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <h3 className="text-lg font-bold mb-4">Fund Bounty</h3>
+            <h3 className="text-lg font-bold mb-2">Fund Bounty</h3>
 
-            <div>
-              <label className="block text-sm font-medium mb-1">Amount (ETH)</label>
+            <div className="space-y-1">
+              <label className="block text-sm font-medium">Amount (ETH)</label>
               <input
                 type="number"
                 step="0.01"
                 min="0.01"
                 value={fundAmount}
                 onChange={(e) => setFundAmount(e.target.value)}
-                className="w-full px-3 py-2 border rounded text-sm"
+                className="w-full px-3 py-2 border text-sm"
               />
-              <p className="text-xs text-gray-500 mt-1">
-                Current balance: {formatETH(bountyData[6])} ETH
+              <p className="text-xs text-gray-500">
+                Current bounty balance: {formatETH(bountyData[6])} ETH
+              </p>
+              <p className="text-xs text-gray-500">
+                Your wallet balance: {walletBalance ? formatETH(walletBalance.value) : "0"} ETH
               </p>
             </div>
 
@@ -388,13 +394,13 @@ export const BountyManagement: React.FC<BountyManagementProps> = ({
               <button
                 onClick={handleFund}
                 disabled={isWritePending || isReceiptLoading}
-                className="flex-1 py-2 bg-green-600 text-white rounded hover:bg-green-700 disabled:bg-gray-300"
+                className="flex-1 py-1.5 text-sm bg-green-600 text-white hover:bg-green-700 disabled:bg-gray-300"
               >
                 {isWritePending ? "Confirming..." : isReceiptLoading ? "Funding..." : `Fund ${fundAmount} ETH`}
               </button>
               <button
                 onClick={() => { setActiveModal(null); setTxStatus("idle"); }}
-                className="flex-1 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                className="flex-1 py-1.5 text-sm bg-gray-200 text-gray-700 hover:bg-gray-300"
               >
                 Cancel
               </button>
@@ -409,20 +415,20 @@ export const BountyManagement: React.FC<BountyManagementProps> = ({
       {activeModal === "withdraw" && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <h3 className="text-lg font-bold mb-4">Withdraw ETH</h3>
+            <h3 className="text-lg font-bold mb-2">Withdraw ETH</h3>
 
-            <div>
-              <label className="block text-sm font-medium mb-1">Amount (ETH)</label>
+            <div className="space-y-1">
+              <label className="block text-sm font-medium">Amount (ETH)</label>
               <input
                 type="number"
                 step="0.01"
                 min="0"
                 max={formatEther(bountyData[6])}
-                value={withdrawAmount}
+                value={withdrawAmount || formatEther(bountyData[6])}
                 onChange={(e) => setWithdrawAmount(e.target.value)}
-                className="w-full px-3 py-2 border rounded text-sm"
+                className="w-full px-3 py-2 border text-sm"
               />
-              <p className="text-xs text-gray-500 mt-1">
+              <p className="text-xs text-gray-500">
                 Available: {formatETH(bountyData[6])} ETH
               </p>
             </div>
@@ -431,13 +437,13 @@ export const BountyManagement: React.FC<BountyManagementProps> = ({
               <button
                 onClick={handleWithdraw}
                 disabled={isWritePending || isReceiptLoading}
-                className="flex-1 py-2 bg-orange-600 text-white rounded hover:bg-orange-700 disabled:bg-gray-300"
+                className="flex-1 py-1.5 text-sm bg-orange-600 text-white hover:bg-orange-700 disabled:bg-gray-300"
               >
                 {isWritePending ? "Confirming..." : isReceiptLoading ? "Withdrawing..." : "Withdraw"}
               </button>
               <button
                 onClick={() => { setActiveModal(null); setTxStatus("idle"); }}
-                className="flex-1 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                className="flex-1 py-1.5 text-sm bg-gray-200 text-gray-700 hover:bg-gray-300"
               >
                 Cancel
               </button>
@@ -452,25 +458,23 @@ export const BountyManagement: React.FC<BountyManagementProps> = ({
       {activeModal === "artifacts" && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-lg p-6 max-w-md w-full">
-            <h3 className="text-lg font-bold mb-4">Withdraw NFTs</h3>
+            <h3 className="text-lg font-bold mb-2">Withdraw Artifacts</h3>
 
-            <div className="mb-6">
+            <div className="mb-4">
               {checkingNFTs ? (
-                <div className="text-center py-4">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600 mx-auto mb-2"></div>
-                  <p className="text-sm text-gray-600">Checking NFT balances...</p>
+                <div className="py-2">
+                  <div className="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600 mb-2"></div>
+                  <p className="text-sm text-gray-600">Checking artifact balances...</p>
                 </div>
               ) : nftCount > 0 ? (
-                <div className="text-center py-4">
-                  <p className="text-2xl font-bold text-purple-600">{nftCount}</p>
-                  <p className="text-sm text-gray-600">NFTs available to withdraw</p>
-                  <p className="text-xs text-gray-500 mt-2">
-                    All NFTs will be sent to your connected wallet address
-                  </p>
+                <div>
+                  <p className="text-xl font-semibold text-purple-600 mb-1">{nftCount} artifacts available</p>
+                  <p className="text-xs text-gray-500 mb-2">Token IDs: {[...new Set(nftsToWithdraw.flatMap(nft => nft.tokenIds))].map(id => id.toString()).sort((a, b) => Number(a) - Number(b)).join(", ")}</p>
+                  <p className="text-xs text-gray-500">Will be sent to your connected wallet</p>
                 </div>
               ) : (
-                <div className="text-center py-4">
-                  <p className="text-gray-500">No NFTs found in this bounty contract</p>
+                <div className="py-2">
+                  <p className="text-sm text-gray-500">No artifacts found in this bounty contract</p>
                 </div>
               )}
             </div>
@@ -479,13 +483,13 @@ export const BountyManagement: React.FC<BountyManagementProps> = ({
               <button
                 onClick={handleWithdrawArtifacts}
                 disabled={isWritePending || isReceiptLoading || nftCount === 0 || checkingNFTs}
-                className="flex-1 py-2 bg-purple-600 text-white rounded hover:bg-purple-700 disabled:bg-gray-300"
+                className="flex-1 py-1.5 text-sm bg-purple-600 text-white hover:bg-purple-700 disabled:bg-gray-300"
               >
-                {isWritePending ? "Confirming..." : isReceiptLoading ? "Withdrawing..." : `Withdraw All NFTs`}
+                {isWritePending ? "Confirming..." : isReceiptLoading ? "Withdrawing..." : `Withdraw All`}
               </button>
               <button
                 onClick={() => { setActiveModal(null); setTxStatus("idle"); }}
-                className="flex-1 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+                className="flex-1 py-1.5 text-sm bg-gray-200 text-gray-700 hover:bg-gray-300"
               >
                 Cancel
               </button>
