@@ -24,6 +24,7 @@ export const BountyManagement: React.FC<BountyManagementProps> = ({
   const [txStatus, setTxStatus] = useState<"idle" | "confirming" | "processing" | "success" | "error">("idle");
   const [nftCount, setNftCount] = useState(0);
   const [nftsToWithdraw, setNftsToWithdraw] = useState<{tokenContract: Address, tokenIds: bigint[]}[]>([]);
+  const [tokenBalances, setTokenBalances] = useState<Map<bigint, bigint>>(new Map());
   const [checkingNFTs, setCheckingNFTs] = useState(false);
 
   // Form states
@@ -156,6 +157,7 @@ export const BountyManagement: React.FC<BountyManagementProps> = ({
     setCheckingNFTs(true);
     setNftCount(0);
     setNftsToWithdraw([]);
+    setTokenBalances(new Map());
 
     try {
       const withdrawableNFTs: {tokenContract: Address, tokenIds: bigint[]}[] = [];
@@ -199,6 +201,7 @@ export const BountyManagement: React.FC<BountyManagementProps> = ({
       console.log("Found NFTs:", totalCount, "for token contract:", tokenContract);
       console.log("Token balances:", Array.from(tokenBalances.entries()).map(([id, bal]) => `#${id}: ${bal}`).join(", "));
       setNftsToWithdraw(withdrawableNFTs);
+      setTokenBalances(tokenBalances);
       setNftCount(totalCount);
     } catch (error) {
       console.error("Error checking NFT balances:", error);
@@ -469,7 +472,15 @@ export const BountyManagement: React.FC<BountyManagementProps> = ({
               ) : nftCount > 0 ? (
                 <div>
                   <p className="text-xl font-semibold text-purple-600 mb-1">{nftCount} artifacts available</p>
-                  <p className="text-xs text-gray-500 mb-2">Token IDs: {[...new Set(nftsToWithdraw.flatMap(nft => nft.tokenIds))].map(id => id.toString()).sort((a, b) => Number(a) - Number(b)).join(", ")}</p>
+                  <p className="text-xs text-gray-500 mb-2">
+                    Token IDs: {[...new Set(nftsToWithdraw.flatMap(nft => nft.tokenIds))]
+                      .sort((a, b) => Number(a) - Number(b))
+                      .map(id => {
+                        const balance = tokenBalances.get(id);
+                        return balance && balance > 1n ? `${id} (${balance})` : id.toString();
+                      })
+                      .join(", ")}
+                  </p>
                   <p className="text-xs text-gray-500">Will be sent to your connected wallet</p>
                 </div>
               ) : (
