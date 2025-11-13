@@ -305,7 +305,7 @@ export const BountyCard: React.FC<BountyCardProps> = ({
               </span>
             </div>
             <div className="text-gray-400">
-              Token #{tokenToMint.toString()} •{" "}
+              Token #{latestTokenId ? latestTokenId.toString() : tokenToMint.toString()} •{" "}
               {shortenAddress(tokenContract, 6)}
             </div>
           </div>
