@@ -73,6 +73,38 @@ export const BountyCard: React.FC<BountyCardProps> = ({
     functionName: "owner",
   });
 
+  // Always get latest token ID from the contract (for balance checking)
+  const { data: latestTokenId } = useReadContract({
+    address: tokenContract,
+    abi: abi1155,
+    functionName: "latestTokenId",
+  });
+
+  const lastMintedId = bountyData?.[2] || BigInt(0); // lastMintedId
+
+  // Determine which token will be minted
+  // When lastMintedId is 0, it will mint copies of the latest token
+  // When lastMintedId > 0, it will mint lastMintedId + 1
+  const tokenToMint =
+    lastMintedId === BigInt(0)
+      ? latestTokenId
+        ? (latestTokenId as bigint)
+        : BigInt(1)
+      : lastMintedId + BigInt(1);
+
+  // Check user's balance for the latest token on the contract
+  // This shows if they own ANY tokens from this collection, regardless of which bounty they claimed
+  const { data: userTokenBalance } = useReadContract(
+    isConnected && address && latestTokenId
+      ? {
+          address: tokenContract,
+          abi: abi1155,
+          functionName: "balanceOf",
+          args: [address, latestTokenId],
+        }
+      : undefined
+  );
+
   // State for contract metadata
   const [contractMetadata, setContractMetadata] = useState<{
     name?: string;
@@ -96,17 +128,6 @@ export const BountyCard: React.FC<BountyCardProps> = ({
 
     fetchContractMetadata();
   }, [contractUri]);
-
-  // Get latest token ID if lastMintedId is 0
-  const { data: latestTokenId } = useReadContract(
-    bountyData?.[2] === BigInt(0)
-      ? {
-          address: tokenContract,
-          abi: abi1155,
-          functionName: "latestTokenId",
-        }
-      : undefined
-  );
 
   const {
     writeContract,
@@ -159,18 +180,6 @@ export const BountyCard: React.FC<BountyCardProps> = ({
       setTxStatus("error");
     }
   }, [writeError]);
-
-  const lastMintedId = bountyData?.[2] || BigInt(0); // lastMintedId
-
-  // Determine which token will be minted
-  // When lastMintedId is 0, it will mint copies of the latest token
-  // When lastMintedId > 0, it will mint lastMintedId + 1
-  const tokenToMint =
-    lastMintedId === BigInt(0)
-      ? latestTokenId
-        ? (latestTokenId as bigint)
-        : BigInt(1)
-      : lastMintedId + BigInt(1);
 
   if (!bountyData) return null;
 
@@ -304,32 +313,39 @@ export const BountyCard: React.FC<BountyCardProps> = ({
 
         {/* Button column - hidden on mobile, shown on desktop */}
         <div className="flex-shrink-0 items-center hidden sm:flex">
-          {status === "claimable" && !isOwner ? (
-            <button
-              onClick={isConnected ? handleClaim : undefined}
-              disabled={!isConnected || isWritePending || isReceiptLoading}
-              className={`py-2 px-4 rounded font-medium text-sm transition-colors ${
-                !isConnected
-                  ? "bg-green-600 text-white cursor-not-allowed opacity-30"
-                  : isWritePending || isReceiptLoading
-                  ? "bg-gray-300 text-gray-500 cursor-not-allowed"
-                  : "bg-green-600 text-white hover:bg-green-700"
-              }`}
-            >
-              {isWritePending
-                ? "Confirm..."
-                : isReceiptLoading
-                ? "Minting..."
-                : "Mint & Claim"}
-            </button>
-          ) : (
-            <button
-              disabled
-              className="py-2 px-4 rounded font-medium text-sm bg-gray-200 text-gray-500 cursor-not-allowed"
-            >
-              Claimed
-            </button>
-          )}
+          <div className="flex flex-col items-center gap-2">
+            {status === "claimable" && !isOwner ? (
+              <button
+                onClick={isConnected ? handleClaim : undefined}
+                disabled={!isConnected || isWritePending || isReceiptLoading}
+                className={`py-2 px-4 rounded font-medium text-sm transition-colors ${
+                  !isConnected
+                    ? "bg-green-600 text-white cursor-not-allowed opacity-30"
+                    : isWritePending || isReceiptLoading
+                    ? "bg-gray-300 text-gray-500 cursor-not-allowed"
+                    : "bg-green-600 text-white hover:bg-green-700"
+                }`}
+              >
+                {isWritePending
+                  ? "Confirm..."
+                  : isReceiptLoading
+                  ? "Minting..."
+                  : "Mint & Claim"}
+              </button>
+            ) : (
+              <button
+                disabled
+                className="py-2 px-4 rounded font-medium text-sm bg-gray-200 text-gray-500 cursor-not-allowed"
+              >
+                Claimed
+              </button>
+            )}
+            {isConnected && userTokenBalance !== undefined && userTokenBalance > 0n && (
+              <span className="text-xs text-gray-400">
+                You own {userTokenBalance.toString()}
+              </span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -360,6 +376,11 @@ export const BountyCard: React.FC<BountyCardProps> = ({
           >
             Bounty Claimed
           </button>
+        )}
+        {isConnected && userTokenBalance !== undefined && userTokenBalance > 0n && (
+          <div className="text-xs text-gray-400 text-center mt-2">
+            You own {userTokenBalance.toString()}
+          </div>
         )}
         {/* <a
           href={`https://etherscan.io/address/${bountyContract}`}
