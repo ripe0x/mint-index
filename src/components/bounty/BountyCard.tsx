@@ -314,7 +314,7 @@ export const BountyCard: React.FC<BountyCardProps> = ({
         {/* Button column - hidden on mobile, shown on desktop */}
         <div className="flex-shrink-0 items-center hidden sm:flex">
           <div className="flex flex-col items-center gap-2">
-            {status === "claimable" && !isOwner ? (
+            {status === "claimable" ? (
               <button
                 onClick={isConnected ? handleClaim : undefined}
                 disabled={!isConnected || isWritePending || isReceiptLoading}
@@ -337,7 +337,13 @@ export const BountyCard: React.FC<BountyCardProps> = ({
                 disabled
                 className="py-2 px-4 rounded font-medium text-sm bg-gray-200 text-gray-500 cursor-not-allowed"
               >
-                Claimed
+                {isOwner
+                  ? "Your Bounty"
+                  : status === "paused"
+                  ? "Paused"
+                  : status === "insufficient_balance"
+                  ? "No Balance"
+                  : "Claimed"}
               </button>
             )}
             {isConnected && userTokenBalance !== undefined && userTokenBalance > 0n && (
@@ -351,7 +357,7 @@ export const BountyCard: React.FC<BountyCardProps> = ({
 
       {/* Button row for mobile - shown below content */}
       <div className="sm:hidden mt-3 pt-3 border-t">
-        {status === "claimable" && !isOwner ? (
+        {status === "claimable" ? (
           <button
             onClick={isConnected ? handleClaim : undefined}
             disabled={!isConnected || isWritePending || isReceiptLoading}
@@ -374,7 +380,13 @@ export const BountyCard: React.FC<BountyCardProps> = ({
             disabled
             className="w-full py-2 px-4 rounded font-medium text-sm bg-gray-200 text-gray-500 cursor-not-allowed"
           >
-            Bounty Claimed
+            {isOwner
+              ? "Your Bounty"
+              : status === "paused"
+              ? "Paused"
+              : status === "insufficient_balance"
+              ? "No Balance"
+              : "Claimed"}
           </button>
         )}
         {isConnected && userTokenBalance !== undefined && userTokenBalance > 0n && (

@@ -126,34 +126,67 @@ export default function BountyPage() {
                     </div>
                   ) : (
                     <div className="space-y-6">
-                      {/* Contract Selector */}
+                      {/* Contract List */}
                       <div className="bg-white border border-gray-200 rounded-lg p-4">
-                        <label className="block text-sm font-medium mb-2">
-                          Select Bounty Contract
+                        <label className="block text-sm font-medium mb-3">
+                          Your Bounty Contracts ({ownedContracts.length})
                         </label>
-                        <select
-                          value={selectedContract || ""}
-                          onChange={(e) =>
-                            setSelectedContract(e.target.value as Address)
-                          }
-                          className="w-full px-3 py-2 border border-gray-300 rounded text-sm font-mono"
-                        >
-                          {ownedContracts.map((contract) => (
-                            <option key={contract} value={contract}>
-                              {contract}
-                            </option>
+                        <div className="space-y-2">
+                          {ownedContracts.map((contract, index) => (
+                            <div
+                              key={contract}
+                              className={`flex items-center justify-between p-3 rounded border ${
+                                selectedContract === contract
+                                  ? "border-blue-500 bg-blue-50"
+                                  : "border-gray-200 hover:border-gray-300"
+                              }`}
+                            >
+                              <div className="flex items-center gap-3">
+                                <button
+                                  onClick={() => setSelectedContract(contract)}
+                                  className={`w-4 h-4 rounded-full border-2 flex items-center justify-center ${
+                                    selectedContract === contract
+                                      ? "border-blue-500"
+                                      : "border-gray-300"
+                                  }`}
+                                >
+                                  {selectedContract === contract && (
+                                    <div className="w-2 h-2 rounded-full bg-blue-500" />
+                                  )}
+                                </button>
+                                <div>
+                                  <div className="font-mono text-sm">
+                                    {contract.slice(0, 6)}...{contract.slice(-4)}
+                                  </div>
+                                  <div className="text-xs text-gray-500">
+                                    Contract #{index + 1}
+                                  </div>
+                                </div>
+                              </div>
+                              <a
+                                href={`https://etherscan.io/address/${contract}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-sm text-blue-600 hover:underline flex items-center gap-1"
+                              >
+                                <span className="hidden sm:inline">Etherscan</span>
+                                <svg
+                                  xmlns="http://www.w3.org/2000/svg"
+                                  className="h-4 w-4"
+                                  fill="none"
+                                  viewBox="0 0 24 24"
+                                  stroke="currentColor"
+                                >
+                                  <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14"
+                                  />
+                                </svg>
+                              </a>
+                            </div>
                           ))}
-                        </select>
-
-                        <div className="mt-4 flex gap-2">
-                          <a
-                            href={`https://etherscan.io/address/${selectedContract}`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-sm text-blue-600 hover:underline"
-                          >
-                            View on Etherscan →
-                          </a>
                         </div>
                       </div>
 

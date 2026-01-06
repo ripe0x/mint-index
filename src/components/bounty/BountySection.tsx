@@ -28,12 +28,11 @@ export function BountySection({ tokenContract, tokenId }: BountySectionProps) {
 
       setLoading(true);
       try {
-        // Fetch all bounties (including inactive) and filter for this specific token
+        // Fetch all bounties (including inactive) and filter for this token contract
         const allBounties = await fetchAllBounties(false);
         const relevantBounties = allBounties.filter(
           (bounty) =>
-            bounty.tokenContract.toLowerCase() === tokenContract.toLowerCase() &&
-            (bounty.lastMintedId === 0 || bounty.lastMintedId === tokenId)
+            bounty.tokenContract.toLowerCase() === tokenContract.toLowerCase()
         );
         setBounties(relevantBounties);
       } catch (error) {

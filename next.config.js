@@ -1,8 +1,12 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
-  // Config options here
   images: {
-    domains: ["ipfs.io"],
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "ipfs.io",
+      },
+    ],
   },
 };
 
