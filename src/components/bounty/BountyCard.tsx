@@ -5,7 +5,8 @@ import {
   useWriteContract,
   useWaitForTransactionReceipt,
 } from "wagmi";
-import { Address } from "viem";
+import { useQueryClient } from "@tanstack/react-query";
+// Address type imported via BountyData
 import { abiMintBountyNew } from "@/abi/abiMintBountyNew";
 import { abi1155 } from "@/abi/abi1155";
 import { formatETH, shortenAddress, BountyStatus } from "@/lib/bountyHelpers";
@@ -13,112 +14,80 @@ import { TransactionStatus } from "./TransactionStatus";
 import { EnsName } from "./EnsName";
 import { BountyTokenImage } from "./BountyTokenImage";
 import { BountyManagement } from "./BountyManagement";
+import { BountyData } from "@/types/bounty";
 
 interface BountyCardProps {
-  bountyContract: Address;
-  tokenContract?: Address;
+  bountyData: BountyData;
   isOwner?: boolean;
   onUpdate?: () => void;
 }
 
-const DEFAULT_TOKEN_CONTRACT =
-  "0xBA1901b542Aa58f181F7ae18eD6Cd79FdA779C62" as Address;
-
 export const BountyCard: React.FC<BountyCardProps> = ({
-  bountyContract,
-  tokenContract = DEFAULT_TOKEN_CONTRACT,
+  bountyData,
   isOwner,
   onUpdate,
 }) => {
   const { address, isConnected } = useAccount();
+  const queryClient = useQueryClient();
   const [txStatus, setTxStatus] = useState<
     "idle" | "confirming" | "processing" | "success" | "error"
   >("idle");
   const [showManagement, setShowManagement] = useState(false);
 
-  // Read bounty details
-  const { data: bountyData } = useReadContract({
-    address: bountyContract,
-    abi: abiMintBountyNew,
-    functionName: "bounties",
-    args: [tokenContract],
-  });
+  // Extract data from prop (no RPC calls needed for these)
+  const {
+    bountyContract,
+    tokenContract,
+    lastMintedId,
+    maxClaims: artifactsToMint,
+    gasRefundAmount,
+    balance,
+    isActive,
+    owner,
+    tokenName,
+    tokenOwner,
+    contractUri,
+    latestTokenId: latestTokenIdFromAPI,
+    isClaimable: isClaimableFromAPI,
+  } = bountyData;
 
-  // Check if claimable
-  const { data: isClaimable } = useReadContract({
-    address: bountyContract,
-    abi: abiMintBountyNew,
-    functionName: "isBountyClaimable",
-    args: [tokenContract],
-  });
-
-  // Read bounty contract owner
-  const { data: owner } = useReadContract({
-    address: bountyContract,
-    abi: abiMintBountyNew,
-    functionName: "owner",
-  });
-
-  // Read contract URI for metadata
-  const { data: contractUri } = useReadContract({
-    address: tokenContract,
-    abi: abi1155,
-    functionName: "contractURI",
-  });
-
-  // Read token contract owner
-  const { data: tokenOwner } = useReadContract({
-    address: tokenContract,
-    abi: abi1155,
-    functionName: "owner",
-  });
-
-  // Always get latest token ID from the contract (for balance checking)
-  const { data: latestTokenId } = useReadContract({
-    address: tokenContract,
-    abi: abi1155,
-    functionName: "latestTokenId",
-  });
-
-  const lastMintedId = bountyData?.[2] || BigInt(0); // lastMintedId
+  const minterReward = Number(gasRefundAmount);
+  const lastMintedIdBigInt = BigInt(lastMintedId);
 
   // Determine which token will be minted
-  // When lastMintedId is 0, it will mint copies of the latest token
-  // When lastMintedId > 0, it will mint lastMintedId + 1
   const tokenToMint =
-    lastMintedId === BigInt(0)
-      ? latestTokenId
-        ? (latestTokenId as bigint)
+    lastMintedIdBigInt === BigInt(0)
+      ? latestTokenIdFromAPI
+        ? BigInt(latestTokenIdFromAPI)
         : BigInt(1)
-      : lastMintedId + BigInt(1);
+      : lastMintedIdBigInt + BigInt(1);
 
-  // Check user's balance for the latest token on the contract
-  // This shows if they own ANY tokens from this collection, regardless of which bounty they claimed
+  // Only RPC call we still need: user's token balance (requires connected address)
   const { data: userTokenBalance } = useReadContract(
-    isConnected && address && latestTokenId
+    isConnected && address && latestTokenIdFromAPI
       ? {
           address: tokenContract,
           abi: abi1155,
           functionName: "balanceOf",
-          args: [address, latestTokenId],
+          args: [address, BigInt(latestTokenIdFromAPI)],
         }
       : undefined
   );
 
-  // State for contract metadata
+  // State for contract metadata (fetched from URI if not in API response)
   const [contractMetadata, setContractMetadata] = useState<{
     name?: string;
     image?: string;
     [key: string]: unknown;
-  } | null>(null);
+  } | null>(tokenName ? { name: tokenName } : null);
 
-  // Fetch contract metadata
+  // Fetch contract metadata from URI if not already available
   useEffect(() => {
     async function fetchContractMetadata() {
-      if (!contractUri) return;
+      if (contractMetadata?.name || !contractUri) return;
 
       try {
-        const response = await fetch(contractUri as string);
+        const response = await fetch(contractUri);
         const metadata = await response.json();
         setContractMetadata(metadata);
       } catch (error) {
@@ -127,7 +96,7 @@ export const BountyCard: React.FC<BountyCardProps> = ({
     }
 
     fetchContractMetadata();
-  }, [contractUri]);
+  }, [contractUri, contractMetadata?.name]);
 
   const {
     writeContract,
@@ -143,10 +112,9 @@ export const BountyCard: React.FC<BountyCardProps> = ({
 
   // Determine bounty status
   const getBountyStatus = (): BountyStatus => {
-    if (!bountyData) return "not_available";
-    if (bountyData[1]) return "paused"; // paused
-    if (isClaimable) return "claimable";
-    if (bountyData[6] === BigInt(0)) return "insufficient_balance"; // balance
+    if (!isActive) return "paused";
+    if (isClaimableFromAPI) return "claimable";
+    if (balance === 0n) return "insufficient_balance";
     return "not_available";
   };
 
@@ -168,45 +136,41 @@ export const BountyCard: React.FC<BountyCardProps> = ({
     }
   };
 
-  React.useEffect(() => {
+  // Handle successful claim with optimistic update
+  useEffect(() => {
     if (isSuccess) {
       setTxStatus("success");
+
+      // Optimistically update the local cache
+      queryClient.setQueryData(["bounties"], (old: BountyData[] | undefined) => {
+        if (!old) return old;
+        return old.map((b) =>
+          b.bountyContract === bountyContract && b.tokenContract === tokenContract
+            ? { ...b, isClaimable: false, isActive: false }
+            : b
+        );
+      });
+
       onUpdate?.();
     }
-  }, [isSuccess, onUpdate]);
+  }, [isSuccess, onUpdate, queryClient, bountyContract, tokenContract]);
 
-  React.useEffect(() => {
+  useEffect(() => {
     if (writeError) {
       setTxStatus("error");
     }
   }, [writeError]);
 
-  if (!bountyData) return null;
-
   const status = getBountyStatus();
-
-  const artifactsToMint = Number(bountyData?.[3] || 0); // artifactsToMint (total tokens)
-  const minterReward = Number(bountyData?.[4] || 0); // minterReward (tokens for claimer)
-  const balance = bountyData?.[6] || BigInt(0); // balance
 
   return (
     <div className="bg-white border border-gray-200 rounded-lg p-4 hover:shadow-md transition-shadow relative">
-      {/* Etherscan link positioned absolutely on desktop only */}
-      {/* <a
-        href={`https://etherscan.io/address/${bountyContract}`}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="hidden sm:block absolute top-4 right-4 text-xs text-blue-600 hover:underline"
-      >
-        View on Etherscan →
-      </a> */}
-
       <div className="flex gap-4">
         {/* Token Image - hidden on mobile */}
         <div className="flex-shrink-0 hidden sm:block">
           <BountyTokenImage
             tokenContract={tokenContract}
-            lastMintedId={lastMintedId || BigInt(0)}
+            lastMintedId={lastMintedIdBigInt}
             contractMetadata={contractMetadata}
           />
         </div>
@@ -214,8 +178,6 @@ export const BountyCard: React.FC<BountyCardProps> = ({
         {/* Content */}
         <div className="flex-1">
           <div className="mb-3">
-            {/* Title: Bounty reward */}
-
             <div className="mb-1 text-[16px] leading-snug">
               {artifactsToMint}{" "}
               <a
@@ -224,7 +186,7 @@ export const BountyCard: React.FC<BountyCardProps> = ({
                 rel="noopener noreferrer"
                 className="text-blue-600 hover:underline"
               >
-                {contractMetadata?.name || "Token"}
+                {contractMetadata?.name || tokenName || "Token"}
               </a>{" "}
               by{" "}
               <a
@@ -243,69 +205,26 @@ export const BountyCard: React.FC<BountyCardProps> = ({
               </a>
             </div>
 
-            {/* Owner */}
             <div className="text-[12px] text-gray-600 mb-0">
               Bounty reward: {minterReward} token
-              {(minterReward || 1) === 1 ? "" : "s"}{" "}
-              {/* {owner === address ? "You" : <EnsName address={owner || "0x0"} />}
-              {isOwner && (
-                <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
-                  Your Contract
-                </span>
-              )} */}
+              {minterReward === 1 ? "" : "s"}{" "}
             </div>
 
             <div className="text-[12px] text-gray-600 mb-2">
               Set by{" "}
               {owner === address ? "You" : <EnsName address={owner || "0x0"} />}
-              {/* {isOwner && (
-                <span className="ml-2 text-xs bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
-                  Your Contract
-                </span>
-              )} */}
             </div>
-
-            {/* Token contract info */}
-            {/* <div className="text-xs text-gray-600">
-              On{" "}
-              <a
-                href={`https://networked.art/${tokenContract.toLowerCase()}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-blue-600 hover:underline"
-              >
-                {contractMetadata?.name || "Token"}
-              </a>{" "}
-              by{" "}
-              {tokenOwner ? (
-                <EnsName address={tokenOwner} />
-              ) : (
-                <span className="font-mono text-xs">
-                  {shortenAddress(tokenContract, 4)}
-                </span>
-              )}
-            </div> */}
-
-            {/* Status badge */}
-            {/* <div className="flex items-center gap-2 mt-2">
-              <span className={`text-sm font-medium ${statusDisplay.color}`}>
-                {statusDisplay.emoji} {statusDisplay.text}
-              </span>
-            </div> */}
           </div>
 
-          {/* Secondary details - smaller and less prominent */}
+          {/* Secondary details */}
           <div className="space-y-0.5 text-[11px] text-gray-500 border-t pt-2 mt-2">
             <div className="flex gap-4 md:flex-row flex-col">
-              {/* <span className="text-gray-400">
-                Tokens to mint: {artifactsToMint}
-              </span> */}
               <span className="text-gray-400">
                 Bounty balance: {formatETH(balance)} ETH
               </span>
             </div>
             <div className="text-gray-400">
-              Token #{latestTokenId ? latestTokenId.toString() : tokenToMint.toString()} •{" "}
+              Token #{latestTokenIdFromAPI?.toString() || tokenToMint.toString()} •{" "}
               {shortenAddress(tokenContract, 6)}
             </div>
           </div>
@@ -355,7 +274,7 @@ export const BountyCard: React.FC<BountyCardProps> = ({
         </div>
       </div>
 
-      {/* Button row for mobile - shown below content */}
+      {/* Button row for mobile */}
       <div className="sm:hidden mt-3 pt-3 border-t">
         {status === "claimable" ? (
           <button
@@ -394,14 +313,6 @@ export const BountyCard: React.FC<BountyCardProps> = ({
             You own {userTokenBalance.toString()}
           </div>
         )}
-        {/* <a
-          href={`https://etherscan.io/address/${bountyContract}`}
-          target="_blank"
-          rel="noopener noreferrer"
-          className="block text-[11px] text-blue-600 hover:underline text-center mt-2"
-        >
-          View on Etherscan →
-        </a> */}
       </div>
 
       <TransactionStatus

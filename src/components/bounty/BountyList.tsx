@@ -1,34 +1,25 @@
-import React, { useState, useEffect } from "react";
+import React from "react";
 import { useAccount } from "wagmi";
-import { fetchAllBounties } from "@/lib/fetchBountyEvents";
-import { BountyData } from "@/types/bounty";
+import { useQuery } from "@tanstack/react-query";
+import { fetchBountiesFromAPI } from "@/lib/api";
 import { BountyCard } from "./BountyCard";
 
 export const BountyList: React.FC = () => {
   const { address } = useAccount();
-  const [bounties, setBounties] = useState<BountyData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [refreshKey, setRefreshKey] = useState(0);
 
-  useEffect(() => {
-    async function loadBounties() {
-      setLoading(true);
-      try {
-        // Get all bounties (including inactive ones)
-        const allBounties = await fetchAllBounties(false);
-        setBounties(allBounties);
-      } catch (error) {
-        console.error("Error loading bounties:", error);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    loadBounties();
-  }, [refreshKey]);
+  const {
+    data: bounties = [],
+    isLoading: loading,
+    refetch,
+  } = useQuery({
+    queryKey: ["bounties"],
+    queryFn: fetchBountiesFromAPI,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
+  });
 
   const handleRefresh = () => {
-    setRefreshKey((prev) => prev + 1);
+    refetch();
   };
 
   const activeBounties = bounties.filter((b) => b.isActive && b.balance > 0n);
@@ -67,8 +58,7 @@ export const BountyList: React.FC = () => {
             {activeBounties.map((bounty) => (
               <BountyCard
                 key={`${bounty.bountyContract}-${bounty.tokenContract}`}
-                bountyContract={bounty.bountyContract}
-                tokenContract={bounty.tokenContract}
+                bountyData={bounty}
                 isOwner={
                   address
                     ? bounty.owner.toLowerCase() === address.toLowerCase()
@@ -91,8 +81,7 @@ export const BountyList: React.FC = () => {
             {inactiveBounties.map((bounty) => (
               <BountyCard
                 key={`${bounty.bountyContract}-${bounty.tokenContract}`}
-                bountyContract={bounty.bountyContract}
-                tokenContract={bounty.tokenContract}
+                bountyData={bounty}
                 isOwner={
                   address
                     ? bounty.owner.toLowerCase() === address.toLowerCase()

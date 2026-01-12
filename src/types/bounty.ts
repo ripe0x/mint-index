@@ -13,4 +13,10 @@ export interface BountyData {
   createdAt: number;
   gasRefundRecipient: Address;
   owner: Address;
+  // Extended fields from API (token metadata)
+  tokenName?: string;
+  tokenOwner?: Address;
+  contractUri?: string;
+  latestTokenId?: number;
+  isClaimable?: boolean;
 }

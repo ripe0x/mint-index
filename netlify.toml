@@ -2,11 +2,21 @@
   command = "npm run build"
   publish = ".next"
 
+[functions]
+  directory = "netlify/functions"
+  node_bundler = "esbuild"
+
 [[plugins]]
   package = "@netlify/plugin-nextjs"
 
 [build.environment]
   NODE_VERSION = "20"
+
+# API route rewrite
+[[redirects]]
+  from = "/api/bounties"
+  to = "/.netlify/functions/bounties"
+  status = 200
 
 [[redirects]]
   from = "https://mint-index.netlify.app/*"
