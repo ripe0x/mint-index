@@ -49,6 +49,8 @@ export const BountyCard: React.FC<BountyCardProps> = ({
     contractUri,
     latestTokenId: latestTokenIdFromAPI,
     isClaimable: isClaimableFromAPI,
+    ownerEnsName,
+    tokenOwnerEnsName,
   } = bountyData;
 
   const minterReward = Number(gasRefundAmount);
@@ -196,7 +198,7 @@ export const BountyCard: React.FC<BountyCardProps> = ({
                 className="text-blue-600 hover:underline"
               >
                 {tokenOwner ? (
-                  <EnsName address={tokenOwner} />
+                  <EnsName address={tokenOwner} cachedName={tokenOwnerEnsName} />
                 ) : (
                   <span className="font-mono text-xs">
                     {shortenAddress(tokenContract, 4)}
@@ -212,7 +214,7 @@ export const BountyCard: React.FC<BountyCardProps> = ({
 
             <div className="text-[12px] text-gray-600 mb-2">
               Set by{" "}
-              {owner === address ? "You" : <EnsName address={owner || "0x0"} />}
+              {owner === address ? "You" : <EnsName address={owner || "0x0"} cachedName={ownerEnsName} />}
             </div>
           </div>
 

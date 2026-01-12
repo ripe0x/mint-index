@@ -19,4 +19,7 @@ export interface BountyData {
   contractUri?: string;
   latestTokenId?: number;
   isClaimable?: boolean;
+  // Cached ENS names (resolved server-side)
+  ownerEnsName?: string | null;
+  tokenOwnerEnsName?: string | null;
 }

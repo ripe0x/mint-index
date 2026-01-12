@@ -81,6 +81,9 @@ export interface BountyDataAPI {
   contractUri?: string;
   latestTokenId?: number;
   isClaimable?: boolean;
+  // Cached ENS names
+  ownerEnsName?: string | null;
+  tokenOwnerEnsName?: string | null;
 }
 
 interface BountyContractDeployed {
@@ -282,6 +285,42 @@ export async function fetchAllBounties(): Promise<BountyDataAPI[]> {
         latestTokenId: tokenMeta.latestTokenId,
         isClaimable: claimableResult.status === "success" ? (claimableResult.result as boolean) : false,
       });
+    }
+  }
+
+  // Step 4: Resolve ENS names for all unique addresses
+  const uniqueAddresses = new Set<string>();
+  for (const bounty of bounties) {
+    uniqueAddresses.add(bounty.owner.toLowerCase());
+    if (bounty.tokenOwner) {
+      uniqueAddresses.add(bounty.tokenOwner.toLowerCase());
+    }
+  }
+
+  const addressArray = Array.from(uniqueAddresses);
+  const ensMap = new Map<string, string | null>();
+
+  // Resolve ENS names in parallel (with error handling for each)
+  const ensResults = await Promise.all(
+    addressArray.map(async (addr) => {
+      try {
+        const name = await client.getEnsName({ address: addr as Address });
+        return { addr, name };
+      } catch {
+        return { addr, name: null };
+      }
+    })
+  );
+
+  for (const { addr, name } of ensResults) {
+    ensMap.set(addr, name);
+  }
+
+  // Add ENS names to bounties
+  for (const bounty of bounties) {
+    bounty.ownerEnsName = ensMap.get(bounty.owner.toLowerCase()) || null;
+    if (bounty.tokenOwner) {
+      bounty.tokenOwnerEnsName = ensMap.get(bounty.tokenOwner.toLowerCase()) || null;
     }
   }
 

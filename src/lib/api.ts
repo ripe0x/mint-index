@@ -19,6 +19,8 @@ interface BountyDataAPI {
   contractUri?: string;
   latestTokenId?: number;
   isClaimable?: boolean;
+  ownerEnsName?: string | null;
+  tokenOwnerEnsName?: string | null;
 }
 
 function parseAPIResponse(data: BountyDataAPI[]): BountyData[] {
@@ -40,6 +42,8 @@ function parseAPIResponse(data: BountyDataAPI[]): BountyData[] {
     contractUri: item.contractUri,
     latestTokenId: item.latestTokenId,
     isClaimable: item.isClaimable,
+    ownerEnsName: item.ownerEnsName,
+    tokenOwnerEnsName: item.tokenOwnerEnsName,
   }));
 }
 

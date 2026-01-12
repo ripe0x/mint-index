@@ -8,20 +8,30 @@ interface EnsNameProps {
   address: Address;
   className?: string;
   showFullAddress?: boolean;
+  cachedName?: string | null; // Pre-resolved ENS name from API
 }
 
 export const EnsName: React.FC<EnsNameProps> = ({
   address,
   className = "",
   showFullAddress = false,
+  cachedName,
 }) => {
+  // Skip RPC call if we have a cached name
   const { data: ensName } = useEnsName({
     address,
     chainId: mainnet.id,
+    query: {
+      enabled: !cachedName, // Only fetch if no cached name
+      staleTime: 60 * 60 * 1000, // 1 hour - ENS names rarely change
+      gcTime: 24 * 60 * 60 * 1000, // 24 hours cache
+    },
   });
 
-  if (ensName) {
-    return <span className={className}>{ensName}</span>;
+  const displayName = cachedName || ensName;
+
+  if (displayName) {
+    return <span className={className}>{displayName}</span>;
   }
 
   return (
