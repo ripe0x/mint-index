@@ -1,6 +1,27 @@
 import { createPublicClient, http, Address, parseAbiItem } from "viem";
 import { mainnet, sepolia } from "viem/chains";
 
+// Server-side RPC call counter
+const rpcStats = {
+  reset() {
+    this.calls = { getLogs: 0, multicall: 0, getEnsName: 0, other: 0 };
+    this.startTime = Date.now();
+  },
+  calls: { getLogs: 0, multicall: 0, getEnsName: 0, other: 0 },
+  startTime: Date.now(),
+  log() {
+    const duration = Date.now() - this.startTime;
+    const total = Object.values(this.calls).reduce((a, b) => a + b, 0);
+    console.log(`[Server RPC Stats] Total: ${total} calls in ${duration}ms`);
+    console.log(`  - getLogs: ${this.calls.getLogs}`);
+    console.log(`  - multicall: ${this.calls.multicall} (batched contract reads)`);
+    console.log(`  - getEnsName: ${this.calls.getEnsName}`);
+    console.log(`  - other: ${this.calls.other}`);
+  },
+};
+
+export { rpcStats };
+
 // ABIs for contract calls (minimal versions for what we need)
 const bountyAbi = [
   {
@@ -159,6 +180,7 @@ async function fetchTokenMetadata(uri: string): Promise<{ name?: string; image?:
 }
 
 export async function fetchAllBounties(): Promise<BountyDataAPI[]> {
+  rpcStats.reset();
   const client = createClient();
 
   // Step 1: Get all deployed bounty contracts and token contracts
@@ -166,6 +188,7 @@ export async function fetchAllBounties(): Promise<BountyDataAPI[]> {
     fetchBountyFactoryEvents(client),
     fetchAllTokenContracts(client),
   ]);
+  rpcStats.calls.getLogs += 2; // Two getLogs calls above
 
   if (deployedContracts.length === 0) {
     return [];
@@ -212,6 +235,7 @@ export async function fetchAllBounties(): Promise<BountyDataAPI[]> {
     client.multicall({ contracts: claimableContracts, allowFailure: true }),
     client.multicall({ contracts: tokenMetadataContracts, allowFailure: true }),
   ]);
+  rpcStats.calls.multicall += 3; // Three multicall batches
 
   // Parse token metadata into a map
   const tokenMetadataMap = new Map<
@@ -305,8 +329,10 @@ export async function fetchAllBounties(): Promise<BountyDataAPI[]> {
     addressArray.map(async (addr) => {
       try {
         const name = await client.getEnsName({ address: addr as Address });
+        rpcStats.calls.getEnsName++;
         return { addr, name };
       } catch {
+        rpcStats.calls.getEnsName++;
         return { addr, name: null };
       }
     })
@@ -323,6 +349,10 @@ export async function fetchAllBounties(): Promise<BountyDataAPI[]> {
       bounty.tokenOwnerEnsName = ensMap.get(bounty.tokenOwner.toLowerCase()) || null;
     }
   }
+
+  // Log RPC stats
+  rpcStats.log();
+  console.log(`[Server] Returning ${bounties.length} bounties, ${addressArray.length} unique addresses resolved`);
 
   return bounties;
 }

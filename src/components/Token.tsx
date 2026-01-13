@@ -8,20 +8,56 @@ import { useErrorHandler } from "@/app/utils/errors";
 import DisplayName from "./DisplayName";
 import Link from "next/link";
 
+interface CachedTokenData {
+  name: string;
+  description: string;
+  mintedBlock: number;
+  closeAt: number;
+  mintOpenUntil: number;
+  totalMinted: number;
+  uri?: string;
+  metadata?: {
+    image?: string;
+    animation_url?: string;
+    name?: string;
+    description?: string;
+  };
+}
+
 type Props = {
   contractAddress: Address;
   tokenId: number;
   deployerAddress: Address;
+  cachedData?: CachedTokenData;
 };
 
-export const Token = ({ contractAddress, tokenId, deployerAddress }: Props) => {
-  const [tokenData, setTokenData] = useState<TokenData | null>(null);
-  const [metadata, setMetadata] = useState<TokenMetadata | null>(null);
-  const [loading, setLoading] = useState<boolean>(true);
+export const Token = ({ contractAddress, tokenId, deployerAddress, cachedData }: Props) => {
+  const [tokenData, setTokenData] = useState<TokenData | null>(
+    cachedData
+      ? {
+          name: cachedData.name,
+          description: cachedData.description,
+          mintedBlock: cachedData.mintedBlock,
+          closeAt: cachedData.closeAt,
+          mintOpenUntil: cachedData.mintOpenUntil,
+        }
+      : null
+  );
+  const [metadata, setMetadata] = useState<TokenMetadata | null>(
+    cachedData?.metadata
+      ? {
+          name: cachedData.metadata.name || cachedData.name,
+          description: cachedData.metadata.description || cachedData.description,
+          image: cachedData.metadata.image || "",
+          animation_url: cachedData.metadata.animation_url,
+        }
+      : null
+  );
+  const [loading, setLoading] = useState<boolean>(!cachedData);
   const [isTextTruncated, setIsTextTruncated] = useState(false);
   const textRef = useRef<HTMLParagraphElement>(null);
   const { error, handleError } = useErrorHandler();
-  const [totalMinted, setTotalMinted] = useState<number>(0);
+  const [totalMinted, setTotalMinted] = useState<number>(cachedData?.totalMinted || 0);
 
   // Memoize the token identifier to prevent unnecessary re-fetches
   const tokenIdentifier = useMemo(
@@ -29,7 +65,11 @@ export const Token = ({ contractAddress, tokenId, deployerAddress }: Props) => {
     [contractAddress, tokenId]
   );
 
+  // Only fetch data if not provided via cache
   useEffect(() => {
+    // Skip fetching if we have cached data
+    if (cachedData) return;
+
     let mounted = true;
 
     async function fetchTokenData() {
@@ -108,7 +148,7 @@ export const Token = ({ contractAddress, tokenId, deployerAddress }: Props) => {
     return () => {
       mounted = false;
     };
-  }, [tokenIdentifier, handleError, contractAddress, tokenId]);
+  }, [tokenIdentifier, handleError, contractAddress, tokenId, cachedData]);
 
   useEffect(() => {
     if (textRef.current) {
@@ -120,8 +160,48 @@ export const Token = ({ contractAddress, tokenId, deployerAddress }: Props) => {
     }
   }, [tokenData?.description]);
 
-  // Get total minted from events
+  // Fetch metadata from URI if we have cached data with URI but no metadata
   useEffect(() => {
+    if (!cachedData?.uri || metadata) return;
+
+    let mounted = true;
+
+    async function fetchMetadataFromUri() {
+      try {
+        let fetchUrl = cachedData!.uri!;
+        if (fetchUrl.startsWith("ipfs://")) {
+          fetchUrl = `https://ipfs.io/ipfs/${fetchUrl.slice(7)}`;
+        }
+
+        const response = await fetch(fetchUrl);
+        if (!response.ok) return;
+
+        const data = await response.json();
+        if (mounted) {
+          setMetadata({
+            name: data.name || cachedData!.name,
+            description: data.description || cachedData!.description,
+            image: data.image || "",
+            animation_url: data.animation_url,
+          });
+        }
+      } catch (err) {
+        console.error("Error fetching metadata:", err);
+      }
+    }
+
+    fetchMetadataFromUri();
+
+    return () => {
+      mounted = false;
+    };
+  }, [cachedData?.uri, metadata, cachedData]);
+
+  // Get total minted from events - skip if we have cached data
+  useEffect(() => {
+    // Skip if we have cached totalMinted
+    if (cachedData?.totalMinted !== undefined) return;
+
     const fetchTotalMinted = async () => {
       if (!tokenId) return;
 
@@ -156,7 +236,7 @@ export const Token = ({ contractAddress, tokenId, deployerAddress }: Props) => {
     };
 
     fetchTotalMinted();
-  }, [tokenId, contractAddress]);
+  }, [tokenId, contractAddress, cachedData?.totalMinted]);
 
   if (loading)
     return (

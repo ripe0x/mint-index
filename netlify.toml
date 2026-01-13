@@ -12,10 +12,20 @@
 [build.environment]
   NODE_VERSION = "20"
 
-# API route rewrite
+# API route rewrites
 [[redirects]]
   from = "/api/bounties"
   to = "/.netlify/functions/bounties"
+  status = 200
+
+[[redirects]]
+  from = "/api/tokens"
+  to = "/.netlify/functions/tokens"
+  status = 200
+
+[[redirects]]
+  from = "/api/token/*"
+  to = "/.netlify/functions/token/:splat"
   status = 200
 
 [[redirects]]

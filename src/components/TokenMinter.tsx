@@ -19,9 +19,12 @@ export default function TokenMinter({ contractAddress, tokenId }: MinterProps) {
   const [mintPrice, setMintPrice] = useState<bigint>(BigInt(0));
   const { isConnected, address } = useAccount();
 
-  // Watch for new blocks
+  // Watch for new blocks - only when connected to show live price
   const { data: blockData } = useBlock({
-    watch: true,
+    watch: isConnected,
+    query: {
+      refetchInterval: isConnected ? 12000 : false, // Poll every 12s (1 block) when connected
+    },
   });
 
   // Write contract

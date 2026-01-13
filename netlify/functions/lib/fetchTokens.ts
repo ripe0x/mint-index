@@ -1,0 +1,267 @@
+import { createPublicClient, http, Address, parseAbiItem } from "viem";
+import { mainnet, sepolia } from "viem/chains";
+
+const tokenAbi = [
+  {
+    type: "function",
+    name: "latestTokenId",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "get",
+    inputs: [{ name: "tokenId", type: "uint256" }],
+    outputs: [
+      { name: "name", type: "string" },
+      { name: "description", type: "string" },
+      { name: "artifact", type: "address[]" },
+      { name: "renderer", type: "uint32" },
+      { name: "mintedBlock", type: "uint32" },
+      { name: "closeAt", type: "uint64" },
+      { name: "data", type: "uint128" },
+    ],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "uri",
+    inputs: [{ name: "tokenId", type: "uint256" }],
+    outputs: [{ name: "", type: "string" }],
+    stateMutability: "view",
+  },
+  {
+    type: "function",
+    name: "mintOpenUntil",
+    inputs: [{ name: "tokenId", type: "uint256" }],
+    outputs: [{ name: "", type: "uint256" }],
+    stateMutability: "view",
+  },
+] as const;
+
+const FACTORY_ADDRESS_MAINNET = "0xd717Fe677072807057B03705227EC3E3b467b670" as Address;
+const FACTORY_ADDRESS_SEPOLIA = "0x750C5a6CFD40C9CaA48C31D87AC2a26101Acd517" as Address;
+const FACTORY_DEPLOYMENT_BLOCK_MAINNET = 21167599n;
+const FACTORY_DEPLOYMENT_BLOCK_SEPOLIA = 7057962n;
+
+export interface TokenMetadataAPI {
+  image?: string;
+  animation_url?: string;
+  name?: string;
+  description?: string;
+}
+
+export interface TokenDataAPI {
+  contractAddress: string;
+  deployerAddress: string;
+  tokenId: number;
+  mintedBlock: number;
+  name: string;
+  description: string;
+  closeAt: number;
+  mintOpenUntil: number;
+  totalMinted: number;
+  uri?: string;
+  metadata?: TokenMetadataAPI;
+}
+
+// RPC stats for logging
+const rpcStats = {
+  reset() {
+    this.calls = { getLogs: 0, multicall: 0 };
+    this.startTime = Date.now();
+  },
+  calls: { getLogs: 0, multicall: 0 },
+  startTime: Date.now(),
+  log() {
+    const duration = Date.now() - this.startTime;
+    const total = this.calls.getLogs + this.calls.multicall;
+    console.log(`[Tokens RPC Stats] Total: ${total} RPC calls in ${duration}ms`);
+    console.log(`  - getLogs: ${this.calls.getLogs}`);
+    console.log(`  - multicall: ${this.calls.multicall}`);
+  },
+};
+
+function createClient() {
+  const isTestnet = process.env.IS_TESTNET === "true";
+  const alchemyKey = process.env.ALCHEMY_API_KEY;
+
+  if (!alchemyKey) {
+    throw new Error("ALCHEMY_API_KEY environment variable is required");
+  }
+
+  const chain = isTestnet ? sepolia : mainnet;
+  const rpcUrl = isTestnet
+    ? `https://eth-sepolia.g.alchemy.com/v2/${alchemyKey}`
+    : `https://eth-mainnet.g.alchemy.com/v2/${alchemyKey}`;
+
+  return createPublicClient({
+    chain,
+    transport: http(rpcUrl),
+  });
+}
+
+export async function fetchAllTokens(): Promise<TokenDataAPI[]> {
+  rpcStats.reset();
+  const client = createClient();
+  const isTestnet = process.env.IS_TESTNET === "true";
+
+  const factoryAddress = isTestnet ? FACTORY_ADDRESS_SEPOLIA : FACTORY_ADDRESS_MAINNET;
+  const deploymentBlock = isTestnet ? FACTORY_DEPLOYMENT_BLOCK_SEPOLIA : FACTORY_DEPLOYMENT_BLOCK_MAINNET;
+
+  // Step 1: Get all contract creation events
+  const createdLogs = await client.getLogs({
+    address: factoryAddress,
+    event: parseAbiItem("event Created(address indexed ownerAddress, address contractAddress)"),
+    fromBlock: deploymentBlock,
+    toBlock: "latest",
+  });
+  rpcStats.calls.getLogs++;
+
+  const contracts = createdLogs
+    .map((log) => ({
+      owner: log.args.ownerAddress as Address,
+      contractAddress: log.args.contractAddress as Address,
+    }))
+    .filter((c) => c.contractAddress);
+
+  if (contracts.length === 0) {
+    return [];
+  }
+
+  console.log(`[Tokens] Found ${contracts.length} contracts`);
+
+  // Step 2: Get latestTokenId for each contract using multicall
+  const latestTokenIdCalls = contracts.map((c) => ({
+    address: c.contractAddress,
+    abi: tokenAbi,
+    functionName: "latestTokenId" as const,
+  }));
+
+  const latestTokenIdResults = await client.multicall({
+    contracts: latestTokenIdCalls,
+    allowFailure: true,
+  });
+  rpcStats.calls.multicall++;
+
+  // Build list of all token calls needed
+  type TokenMeta = { contractAddress: Address; deployerAddress: Address; tokenId: number };
+  const tokenMeta: TokenMeta[] = [];
+
+  for (let i = 0; i < contracts.length; i++) {
+    const result = latestTokenIdResults[i];
+    if (result.status !== "success") continue;
+
+    const latestTokenId = Number(result.result);
+    const contract = contracts[i];
+
+    for (let tokenId = 1; tokenId <= latestTokenId; tokenId++) {
+      tokenMeta.push({
+        contractAddress: contract.contractAddress,
+        deployerAddress: contract.owner,
+        tokenId,
+      });
+    }
+  }
+
+  console.log(`[Tokens] Fetching ${tokenMeta.length} tokens across ${contracts.length} contracts`);
+
+  // Step 3: Build multicall for get(), uri(), and mintOpenUntil() for each token
+  const allCalls = tokenMeta.flatMap((meta) => [
+    { address: meta.contractAddress, abi: tokenAbi, functionName: "get" as const, args: [BigInt(meta.tokenId)] as const },
+    { address: meta.contractAddress, abi: tokenAbi, functionName: "uri" as const, args: [BigInt(meta.tokenId)] as const },
+    { address: meta.contractAddress, abi: tokenAbi, functionName: "mintOpenUntil" as const, args: [BigInt(meta.tokenId)] as const },
+  ]);
+
+  // Step 4: Batch all calls using multicall (in chunks)
+  const CHUNK_SIZE = 150; // 3 calls per token, so 50 tokens per chunk
+  const allResults: { status: "success" | "failure"; result?: unknown }[] = [];
+
+  for (let i = 0; i < allCalls.length; i += CHUNK_SIZE) {
+    const chunk = allCalls.slice(i, i + CHUNK_SIZE);
+    const results = await client.multicall({
+      contracts: chunk,
+      allowFailure: true,
+    });
+    rpcStats.calls.multicall++;
+    allResults.push(...results);
+  }
+
+  // Step 5: Get NewMint events for all contracts to calculate totalMinted
+  // Parallelize with concurrency limit
+  const mintCountMap = new Map<string, number>(); // key: "contractAddress-tokenId"
+  const LOGS_BATCH_SIZE = 10; // Fetch 10 contracts' logs in parallel
+
+  for (let i = 0; i < contracts.length; i += LOGS_BATCH_SIZE) {
+    const batch = contracts.slice(i, i + LOGS_BATCH_SIZE);
+    const batchResults = await Promise.all(
+      batch.map(async (contract) => {
+        try {
+          const mintLogs = await client.getLogs({
+            address: contract.contractAddress,
+            event: parseAbiItem("event NewMint(uint256 indexed tokenId, uint256 unitPrice, uint256 amount, address minter)"),
+            fromBlock: deploymentBlock,
+            toBlock: "latest",
+          });
+          rpcStats.calls.getLogs++;
+          return { contractAddress: contract.contractAddress, logs: mintLogs };
+        } catch (err) {
+          console.error(`Error fetching mint events for ${contract.contractAddress}:`, err);
+          return { contractAddress: contract.contractAddress, logs: [] };
+        }
+      })
+    );
+
+    for (const { contractAddress, logs } of batchResults) {
+      for (const log of logs) {
+        const tokenId = Number(log.args.tokenId);
+        const amount = Number(log.args.amount || 0);
+        const key = `${contractAddress.toLowerCase()}-${tokenId}`;
+        mintCountMap.set(key, (mintCountMap.get(key) || 0) + amount);
+      }
+    }
+  }
+
+  // Step 6: Parse results
+  const tokens: TokenDataAPI[] = [];
+
+  for (let i = 0; i < tokenMeta.length; i++) {
+    const meta = tokenMeta[i];
+    const getResult = allResults[i * 3];
+    const uriResult = allResults[i * 3 + 1];
+    const mintOpenUntilResult = allResults[i * 3 + 2];
+
+    if (getResult.status !== "success") continue;
+
+    const details = getResult.result as [string, string, Address[], number, number, bigint, bigint];
+    const uri = uriResult.status === "success" ? (uriResult.result as string) : undefined;
+    const mintOpenUntil = mintOpenUntilResult.status === "success" ? Number(mintOpenUntilResult.result) : 0;
+    const mintKey = `${meta.contractAddress.toLowerCase()}-${meta.tokenId}`;
+    const totalMinted = mintCountMap.get(mintKey) || 0;
+
+    tokens.push({
+      contractAddress: meta.contractAddress,
+      deployerAddress: meta.deployerAddress,
+      tokenId: meta.tokenId,
+      mintedBlock: Number(details[4]),
+      name: details[0],
+      description: details[1],
+      closeAt: Number(details[5]),
+      mintOpenUntil,
+      totalMinted,
+      uri,
+    });
+
+  }
+
+  // Sort by minted block descending (newest first)
+  tokens.sort((a, b) => b.mintedBlock - a.mintedBlock);
+
+  // Note: Metadata (images) fetched client-side to avoid slow IPFS/external requests
+
+  rpcStats.log();
+  console.log(`[Tokens] Returning ${tokens.length} tokens`);
+
+  return tokens;
+}

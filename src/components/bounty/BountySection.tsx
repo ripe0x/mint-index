@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { Address } from "viem";
-import { fetchAllBounties } from "@/lib/fetchBountyEvents";
+import { useQuery } from "@tanstack/react-query";
+import { fetchBountiesFromAPI } from "@/lib/api";
 import { BountyData } from "@/types/bounty";
 import { BountyItem } from "./BountyItem";
 import Link from "next/link";
@@ -11,39 +12,25 @@ interface BountySectionProps {
 }
 
 export function BountySection({ tokenContract, tokenId }: BountySectionProps) {
-  const [bounties, setBounties] = useState<BountyData[]>([]);
-  const [loading, setLoading] = useState(true);
   const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
     setMounted(true);
   }, []);
 
-  useEffect(() => {
-    async function fetchBounties() {
-      if (!tokenContract) {
-        setLoading(false);
-        return;
-      }
+  // Use cached bounties API
+  const { data: allBounties = [], isLoading: loading } = useQuery({
+    queryKey: ["bounties"],
+    queryFn: fetchBountiesFromAPI,
+    staleTime: 5 * 60 * 1000, // 5 minutes
+    gcTime: 10 * 60 * 1000, // 10 minutes
+  });
 
-      setLoading(true);
-      try {
-        // Fetch all bounties (including inactive) and filter for this token contract
-        const allBounties = await fetchAllBounties(false);
-        const relevantBounties = allBounties.filter(
-          (bounty) =>
-            bounty.tokenContract.toLowerCase() === tokenContract.toLowerCase()
-        );
-        setBounties(relevantBounties);
-      } catch (error) {
-        console.error("Error fetching bounties:", error);
-      } finally {
-        setLoading(false);
-      }
-    }
-
-    fetchBounties();
-  }, [tokenContract, tokenId]);
+  // Filter for this token contract
+  const bounties = allBounties.filter(
+    (bounty) =>
+      bounty.tokenContract.toLowerCase() === tokenContract.toLowerCase()
+  );
 
   // Don't render during SSR
   if (!mounted) {

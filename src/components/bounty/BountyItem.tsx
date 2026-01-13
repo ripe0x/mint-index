@@ -1,6 +1,5 @@
 import React from "react";
-import { useAccount, useReadContract } from "wagmi";
-import { abiMintBountyNew } from "@/abi/abiMintBountyNew";
+import { useAccount } from "wagmi";
 import { BountyData } from "@/types/bounty";
 import { BountyClaimButton } from "./BountyClaimButton";
 import DisplayName from "@/components/DisplayName";
@@ -12,16 +11,8 @@ interface BountyItemProps {
 export function BountyItem({ bounty }: BountyItemProps) {
   const { isConnected } = useAccount();
 
-  // Check if claimable from the contract
-  const { data: isClaimable } = useReadContract({
-    address: bounty.bountyContract,
-    abi: abiMintBountyNew,
-    functionName: "isBountyClaimable",
-    args: [bounty.tokenContract],
-  });
-
-  // Check if actually claimable
-  const isActive = bounty.isActive && bounty.balance > 0n && !!isClaimable;
+  // Use cached isClaimable from API instead of RPC call
+  const isActive = bounty.isActive && bounty.balance > 0n && !!bounty.isClaimable;
 
   return (
     <div className="border border-gray-100 rounded-lg p-3 bg-gray-50">
@@ -31,7 +22,7 @@ export function BountyItem({ bounty }: BountyItemProps) {
             Bounty reward: 1 token
           </p>
           <p className="text-[11px] opacity-70">
-            From <DisplayName address={bounty.owner} />
+            From <DisplayName address={bounty.owner} cachedName={bounty.ownerEnsName} />
           </p>
         </div>
 

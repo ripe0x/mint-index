@@ -1,6 +1,44 @@
 import type { AppProps } from "next/app";
 import "../styles/global.css";
 import "@rainbow-me/rainbowkit/styles.css";
+
+// RPC Call Counter (development only)
+if (typeof window !== "undefined" && process.env.NODE_ENV === "development") {
+  const rpcStats = { total: 0, methods: {} as Record<string, number> };
+  const originalFetch = window.fetch;
+
+  window.fetch = async (...args) => {
+    const [url, options] = args;
+    const urlStr = typeof url === "string" ? url : url instanceof URL ? url.href : "";
+
+    // Check if this is an RPC call (Alchemy, Infura, or public RPC)
+    if (urlStr.includes("alchemy.com") || urlStr.includes("infura.io") || urlStr.includes("cloudflare-eth")) {
+      rpcStats.total++;
+
+      // Try to parse the method name
+      try {
+        const body = options?.body;
+        if (body && typeof body === "string") {
+          const parsed = JSON.parse(body);
+          const method = parsed.method || "unknown";
+          rpcStats.methods[method] = (rpcStats.methods[method] || 0) + 1;
+        }
+      } catch {}
+
+      // Log summary every 2 seconds (debounced)
+      clearTimeout((window as unknown as { __rpcTimer?: ReturnType<typeof setTimeout> }).__rpcTimer);
+      (window as unknown as { __rpcTimer?: ReturnType<typeof setTimeout> }).__rpcTimer = setTimeout(() => {
+        console.log(
+          `%c[RPC Stats] Total: ${rpcStats.total} calls`,
+          "background: #222; color: #0f0; padding: 4px 8px; border-radius: 4px;"
+        );
+        console.table(rpcStats.methods);
+      }, 2000);
+    }
+
+    return originalFetch(...args);
+  };
+}
 import {
   RainbowKitProvider,
   getDefaultConfig,
