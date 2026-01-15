@@ -102,8 +102,262 @@ function createClient() {
   });
 }
 
-export async function fetchAllTokens(): Promise<TokenDataAPI[]> {
+export interface CachedTokensData {
+  tokens: TokenDataAPI[];
+  lastBlock: number;
+  contractTokenCounts: Record<string, number>; // contract address -> last known tokenId
+}
+
+// Incremental fetch - only get new tokens since last fetch
+export async function fetchTokensIncremental(
+  existingData?: CachedTokensData
+): Promise<CachedTokensData> {
   rpcStats.reset();
+  const client = createClient();
+  const isTestnet = process.env.IS_TESTNET === "true";
+
+  const factoryAddress = isTestnet ? FACTORY_ADDRESS_SEPOLIA : FACTORY_ADDRESS_MAINNET;
+  const deploymentBlock = isTestnet ? FACTORY_DEPLOYMENT_BLOCK_SEPOLIA : FACTORY_DEPLOYMENT_BLOCK_MAINNET;
+
+  // Get current block
+  const currentBlock = await client.getBlockNumber();
+
+  // Start from last processed block or deployment block
+  const fromBlock = existingData?.lastBlock
+    ? BigInt(existingData.lastBlock + 1)
+    : deploymentBlock;
+
+  console.log(`[Tokens] Incremental fetch from block ${fromBlock} to ${currentBlock}`);
+
+  // If we have existing data and it's recent (within 100 blocks), do incremental
+  // Otherwise do full fetch
+  const blockDiff = Number(currentBlock) - (existingData?.lastBlock || 0);
+  const shouldDoFullFetch = !existingData || blockDiff > 50000; // ~1 week of blocks
+
+  if (shouldDoFullFetch) {
+    console.log("[Tokens] Doing full fetch (no existing data or too stale)");
+    const tokens = await fetchAllTokensFull();
+
+    // Build contract token counts
+    const contractTokenCounts: Record<string, number> = {};
+    for (const token of tokens) {
+      const addr = token.contractAddress.toLowerCase();
+      contractTokenCounts[addr] = Math.max(contractTokenCounts[addr] || 0, token.tokenId);
+    }
+
+    return {
+      tokens,
+      lastBlock: Number(currentBlock),
+      contractTokenCounts,
+    };
+  }
+
+  // Incremental fetch
+  console.log("[Tokens] Doing incremental fetch");
+
+  // Step 1: Get NEW contract creation events since last block
+  const newCreatedLogs = await client.getLogs({
+    address: factoryAddress,
+    event: parseAbiItem("event Created(address indexed ownerAddress, address contractAddress)"),
+    fromBlock,
+    toBlock: "latest",
+  });
+  rpcStats.calls.getLogs++;
+
+  const newContracts = newCreatedLogs
+    .map((log) => ({
+      owner: log.args.ownerAddress as Address,
+      contractAddress: log.args.contractAddress as Address,
+    }))
+    .filter((c) => c.contractAddress);
+
+  console.log(`[Tokens] Found ${newContracts.length} new contracts since block ${fromBlock}`);
+
+  // Step 2: Get ALL contracts to check for new tokens on existing contracts
+  const allCreatedLogs = await client.getLogs({
+    address: factoryAddress,
+    event: parseAbiItem("event Created(address indexed ownerAddress, address contractAddress)"),
+    fromBlock: deploymentBlock,
+    toBlock: "latest",
+  });
+  rpcStats.calls.getLogs++;
+
+  const allContracts = allCreatedLogs
+    .map((log) => ({
+      owner: log.args.ownerAddress as Address,
+      contractAddress: log.args.contractAddress as Address,
+    }))
+    .filter((c) => c.contractAddress);
+
+  // Step 3: Check latestTokenId for all contracts
+  const latestTokenIdCalls = allContracts.map((c) => ({
+    address: c.contractAddress,
+    abi: tokenAbi,
+    functionName: "latestTokenId" as const,
+  }));
+
+  const latestTokenIdResults = await client.multicall({
+    contracts: latestTokenIdCalls,
+    allowFailure: true,
+  });
+  rpcStats.calls.multicall++;
+
+  // Step 4: Find tokens we need to fetch (new contracts + new tokens on existing contracts)
+  type TokenMeta = { contractAddress: Address; deployerAddress: Address; tokenId: number };
+  const tokensToFetch: TokenMeta[] = [];
+  const newContractTokenCounts: Record<string, number> = { ...existingData.contractTokenCounts };
+
+  for (let i = 0; i < allContracts.length; i++) {
+    const result = latestTokenIdResults[i];
+    if (result.status !== "success") continue;
+
+    const contract = allContracts[i];
+    const addr = contract.contractAddress.toLowerCase();
+    const latestTokenId = Number(result.result);
+    const previousLatestId = existingData.contractTokenCounts[addr] || 0;
+
+    newContractTokenCounts[addr] = latestTokenId;
+
+    // Fetch tokens we don't have yet
+    for (let tokenId = previousLatestId + 1; tokenId <= latestTokenId; tokenId++) {
+      tokensToFetch.push({
+        contractAddress: contract.contractAddress,
+        deployerAddress: contract.owner,
+        tokenId,
+      });
+    }
+  }
+
+  console.log(`[Tokens] Need to fetch ${tokensToFetch.length} new tokens`);
+
+  if (tokensToFetch.length === 0) {
+    // No new tokens, just update lastBlock
+    return {
+      tokens: existingData.tokens,
+      lastBlock: Number(currentBlock),
+      contractTokenCounts: newContractTokenCounts,
+    };
+  }
+
+  // Step 5: Fetch the new tokens
+  const newTokens = await fetchTokenData(client, tokensToFetch, deploymentBlock);
+
+  // Step 6: Merge with existing tokens and sort
+  const allTokens = [...existingData.tokens, ...newTokens];
+  allTokens.sort((a, b) => b.mintedBlock - a.mintedBlock);
+
+  console.log(`[Tokens] Total: ${allTokens.length} tokens (${newTokens.length} new)`);
+  rpcStats.log();
+
+  return {
+    tokens: allTokens,
+    lastBlock: Number(currentBlock),
+    contractTokenCounts: newContractTokenCounts,
+  };
+}
+
+// Helper to fetch token data for a list of tokens
+type TokenMeta = { contractAddress: Address; deployerAddress: Address; tokenId: number };
+
+async function fetchTokenData(
+  client: ReturnType<typeof createClient>,
+  tokenMeta: TokenMeta[],
+  deploymentBlock: bigint
+): Promise<TokenDataAPI[]> {
+  if (tokenMeta.length === 0) return [];
+
+  // Build multicall for get(), uri(), and mintOpenUntil() for each token
+  const allCalls = tokenMeta.flatMap((meta) => [
+    { address: meta.contractAddress, abi: tokenAbi, functionName: "get" as const, args: [BigInt(meta.tokenId)] as const },
+    { address: meta.contractAddress, abi: tokenAbi, functionName: "uri" as const, args: [BigInt(meta.tokenId)] as const },
+    { address: meta.contractAddress, abi: tokenAbi, functionName: "mintOpenUntil" as const, args: [BigInt(meta.tokenId)] as const },
+  ]);
+
+  // Batch all calls using multicall (in chunks)
+  const CHUNK_SIZE = 150;
+  const allResults: { status: "success" | "failure"; result?: unknown }[] = [];
+
+  for (let i = 0; i < allCalls.length; i += CHUNK_SIZE) {
+    const chunk = allCalls.slice(i, i + CHUNK_SIZE);
+    const results = await client.multicall({
+      contracts: chunk,
+      allowFailure: true,
+    });
+    rpcStats.calls.multicall++;
+    allResults.push(...results);
+  }
+
+  // Get unique contracts for mint events
+  const uniqueContracts = [...new Set(tokenMeta.map((m) => m.contractAddress))];
+  const mintCountMap = new Map<string, number>();
+  const LOGS_BATCH_SIZE = 10;
+
+  for (let i = 0; i < uniqueContracts.length; i += LOGS_BATCH_SIZE) {
+    const batch = uniqueContracts.slice(i, i + LOGS_BATCH_SIZE);
+    const batchResults = await Promise.all(
+      batch.map(async (contractAddress) => {
+        try {
+          const mintLogs = await client.getLogs({
+            address: contractAddress,
+            event: parseAbiItem("event NewMint(uint256 indexed tokenId, uint256 unitPrice, uint256 amount, address minter)"),
+            fromBlock: deploymentBlock,
+            toBlock: "latest",
+          });
+          rpcStats.calls.getLogs++;
+          return { contractAddress, logs: mintLogs };
+        } catch (err) {
+          console.error(`Error fetching mint events for ${contractAddress}:`, err);
+          return { contractAddress, logs: [] };
+        }
+      })
+    );
+
+    for (const { contractAddress, logs } of batchResults) {
+      for (const log of logs) {
+        const tokenId = Number(log.args.tokenId);
+        const amount = Number(log.args.amount || 0);
+        const key = `${contractAddress.toLowerCase()}-${tokenId}`;
+        mintCountMap.set(key, (mintCountMap.get(key) || 0) + amount);
+      }
+    }
+  }
+
+  // Parse results
+  const tokens: TokenDataAPI[] = [];
+
+  for (let i = 0; i < tokenMeta.length; i++) {
+    const meta = tokenMeta[i];
+    const getResult = allResults[i * 3];
+    const uriResult = allResults[i * 3 + 1];
+    const mintOpenUntilResult = allResults[i * 3 + 2];
+
+    if (getResult.status !== "success") continue;
+
+    const details = getResult.result as [string, string, Address[], number, number, bigint, bigint];
+    const uri = uriResult.status === "success" ? (uriResult.result as string) : undefined;
+    const mintOpenUntil = mintOpenUntilResult.status === "success" ? Number(mintOpenUntilResult.result) : 0;
+    const mintKey = `${meta.contractAddress.toLowerCase()}-${meta.tokenId}`;
+    const totalMinted = mintCountMap.get(mintKey) || 0;
+
+    tokens.push({
+      contractAddress: meta.contractAddress,
+      deployerAddress: meta.deployerAddress,
+      tokenId: meta.tokenId,
+      mintedBlock: Number(details[4]),
+      name: details[0],
+      description: details[1],
+      closeAt: Number(details[5]),
+      mintOpenUntil,
+      totalMinted,
+      uri,
+    });
+  }
+
+  return tokens;
+}
+
+// Full fetch (original function, renamed)
+async function fetchAllTokensFull(): Promise<TokenDataAPI[]> {
   const client = createClient();
   const isTestnet = process.env.IS_TESTNET === "true";
 
@@ -264,4 +518,9 @@ export async function fetchAllTokens(): Promise<TokenDataAPI[]> {
   console.log(`[Tokens] Returning ${tokens.length} tokens`);
 
   return tokens;
+}
+
+// Backwards compatible export
+export async function fetchAllTokens(): Promise<TokenDataAPI[]> {
+  return fetchAllTokensFull();
 }

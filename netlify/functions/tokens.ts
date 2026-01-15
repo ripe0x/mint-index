@@ -1,18 +1,18 @@
 import type { Context } from "@netlify/functions";
 import { getStore } from "@netlify/blobs";
-import { fetchAllTokens, TokenDataAPI } from "./lib/fetchTokens";
+import { fetchTokensIncremental, CachedTokensData, TokenDataAPI } from "./lib/fetchTokens";
 
 const CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 const STORE_NAME = "tokens-cache";
-const CACHE_KEY = "all-tokens";
+const CACHE_KEY = "all-tokens-v2"; // New key for new format
 
-interface CachedData {
-  tokens: TokenDataAPI[];
+interface StoredData {
+  data: CachedTokensData;
   timestamp: number;
 }
 
-// In-memory cache as fast layer (still useful within single invocation)
-let memoryCache: CachedData | null = null;
+// In-memory cache as fast layer
+let memoryCache: StoredData | null = null;
 
 export default async function handler(request: Request, context: Context) {
   // Handle CORS preflight
@@ -34,16 +34,16 @@ export default async function handler(request: Request, context: Context) {
     // Step 1: Check memory cache first (fastest)
     if (memoryCache && (now - memoryCache.timestamp) < CACHE_TTL_MS) {
       console.log(`[tokens] Memory cache hit, age: ${Math.round((now - memoryCache.timestamp) / 1000)}s`);
-      return jsonResponse(memoryCache.tokens, "MEMORY_HIT", now - memoryCache.timestamp);
+      return jsonResponse(memoryCache.data.tokens, "MEMORY_HIT", now - memoryCache.timestamp);
     }
 
     // Step 2: Check persistent blob storage
-    let blobData: CachedData | null = null;
+    let blobData: StoredData | null = null;
     try {
-      const stored = await store.get(CACHE_KEY, { type: "json" }) as CachedData | null;
+      const stored = await store.get(CACHE_KEY, { type: "json" }) as StoredData | null;
       if (stored) {
         blobData = stored;
-        memoryCache = stored; // Populate memory cache
+        memoryCache = stored;
       }
     } catch (e) {
       console.log("[tokens] Blob read error:", e);
@@ -54,45 +54,41 @@ export default async function handler(request: Request, context: Context) {
 
     // Step 3: If blob is fresh, return it
     if (blobData && isBlobFresh) {
-      console.log(`[tokens] Blob cache hit, age: ${Math.round(blobAge / 1000)}s`);
-      return jsonResponse(blobData.tokens, "BLOB_HIT", blobAge);
+      console.log(`[tokens] Blob cache hit, age: ${Math.round(blobAge / 1000)}s, ${blobData.data.tokens.length} tokens`);
+      return jsonResponse(blobData.data.tokens, "BLOB_HIT", blobAge);
     }
 
-    // Step 4: If blob exists but stale, return stale data AND refresh in background
+    // Step 4: If blob exists but stale, return stale data AND refresh in background (INCREMENTAL)
     if (blobData) {
-      console.log(`[tokens] Blob stale (age: ${Math.round(blobAge / 1000)}s), returning stale + background refresh`);
-
-      // Trigger background refresh (non-blocking)
-      context.waitUntil(refreshCache(store, now));
-
-      return jsonResponse(blobData.tokens, "STALE_REFRESH", blobAge);
+      console.log(`[tokens] Blob stale (age: ${Math.round(blobAge / 1000)}s), returning stale + incremental refresh`);
+      context.waitUntil(refreshCacheIncremental(store, blobData.data, now));
+      return jsonResponse(blobData.data.tokens, "STALE_REFRESH", blobAge);
     }
 
     // Step 5: No cache at all - must fetch synchronously (only happens on first deploy)
-    console.log("[tokens] No cache found, fetching synchronously...");
+    console.log("[tokens] No cache found, doing full fetch...");
     const startTime = Date.now();
-    const tokens = await fetchAllTokens();
-    console.log(`[tokens] Fetched ${tokens.length} tokens in ${Date.now() - startTime}ms`);
+    const freshData = await fetchTokensIncremental(undefined); // Full fetch when no existing data
+    console.log(`[tokens] Full fetch: ${freshData.tokens.length} tokens in ${Date.now() - startTime}ms`);
 
-    // Save to blob and memory
-    const newCache: CachedData = { tokens, timestamp: now };
-    memoryCache = newCache;
-    await store.setJSON(CACHE_KEY, newCache);
+    const newStored: StoredData = { data: freshData, timestamp: now };
+    memoryCache = newStored;
+    await store.setJSON(CACHE_KEY, newStored);
 
-    return jsonResponse(tokens, "MISS", 0);
+    return jsonResponse(freshData.tokens, "MISS", 0);
 
   } catch (error) {
     console.error("[tokens] Error:", error);
 
     // Try to return any cached data on error
     if (memoryCache) {
-      return jsonResponse(memoryCache.tokens, "ERROR_MEMORY", now - memoryCache.timestamp);
+      return jsonResponse(memoryCache.data.tokens, "ERROR_MEMORY", now - memoryCache.timestamp);
     }
 
     try {
-      const stored = await store.get(CACHE_KEY, { type: "json" }) as CachedData | null;
+      const stored = await store.get(CACHE_KEY, { type: "json" }) as StoredData | null;
       if (stored) {
-        return jsonResponse(stored.tokens, "ERROR_BLOB", now - stored.timestamp);
+        return jsonResponse(stored.data.tokens, "ERROR_BLOB", now - stored.timestamp);
       }
     } catch (e) {
       console.log("[tokens] Blob fallback failed:", e);
@@ -108,20 +104,28 @@ export default async function handler(request: Request, context: Context) {
   }
 }
 
-async function refreshCache(store: ReturnType<typeof getStore>, timestamp: number) {
+async function refreshCacheIncremental(
+  store: ReturnType<typeof getStore>,
+  existingData: CachedTokensData,
+  timestamp: number
+) {
   try {
-    console.log("[tokens] Background refresh starting...");
+    console.log("[tokens] Incremental refresh starting...");
     const startTime = Date.now();
-    const tokens = await fetchAllTokens();
-    console.log(`[tokens] Background refresh: fetched ${tokens.length} tokens in ${Date.now() - startTime}ms`);
 
-    const newCache: CachedData = { tokens, timestamp };
-    memoryCache = newCache;
-    await store.setJSON(CACHE_KEY, newCache);
+    // Incremental fetch - only get new tokens
+    const freshData = await fetchTokensIncremental(existingData);
 
-    console.log("[tokens] Background refresh complete, cache updated");
+    const newTokenCount = freshData.tokens.length - existingData.tokens.length;
+    console.log(`[tokens] Incremental refresh: ${newTokenCount} new tokens in ${Date.now() - startTime}ms`);
+
+    const newStored: StoredData = { data: freshData, timestamp };
+    memoryCache = newStored;
+    await store.setJSON(CACHE_KEY, newStored);
+
+    console.log(`[tokens] Incremental refresh complete, total: ${freshData.tokens.length} tokens`);
   } catch (error) {
-    console.error("[tokens] Background refresh failed:", error);
+    console.error("[tokens] Incremental refresh failed:", error);
   }
 }
 
@@ -134,6 +138,7 @@ function jsonResponse(tokens: TokenDataAPI[], cacheStatus: string, ageMs: number
       "Cache-Control": `public, max-age=${Math.floor(CACHE_TTL_MS / 1000)}, s-maxage=${Math.floor(CACHE_TTL_MS / 1000)}`,
       "X-Cache-Age": `${Math.round(ageMs / 1000)}`,
       "X-Cache-Status": cacheStatus,
+      "X-Token-Count": `${tokens.length}`,
     },
   });
 }

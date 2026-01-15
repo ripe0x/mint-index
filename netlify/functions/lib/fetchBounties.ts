@@ -11,7 +11,7 @@ const rpcStats = {
   startTime: Date.now(),
   log() {
     const duration = Date.now() - this.startTime;
-    const total = Object.values(this.calls).reduce((a, b) => a + b, 0);
+    const total = Object.values(this.calls).reduce((a: number, b: number) => a + b, 0);
     console.log(`[Server RPC Stats] Total: ${total} calls in ${duration}ms`);
     console.log(`  - getLogs: ${this.calls.getLogs}`);
     console.log(`  - multicall: ${this.calls.multicall} (batched contract reads)`);
