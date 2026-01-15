@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { fetchTokensFromAPI, TokenInfo } from "@/lib/api";
+import { fetchTokensFromAPI, TokenInfo, TokensResponse } from "@/lib/api";
 import { Token } from "./Token";
 import { useErrorHandler } from "@/app/utils/errors";
 
@@ -11,15 +11,31 @@ const TokenExplorer = () => {
   const observerTarget = React.useRef<HTMLDivElement>(null);
 
   const {
-    data: tokens = [],
+    data,
     isLoading: loading,
     error: queryError,
+    isFetching,
+    refetch,
   } = useQuery({
     queryKey: ["tokens"],
     queryFn: fetchTokensFromAPI,
     staleTime: 5 * 60 * 1000, // 5 minutes
     gcTime: 10 * 60 * 1000, // 10 minutes
   });
+
+  const tokens = data?.tokens || [];
+  const isStale = data?.isStale || false;
+  const isWarmingUp = data?.isWarmingUp || false;
+
+  // Auto-refetch when warming up (first deploy) or when data is empty
+  useEffect(() => {
+    if (isWarmingUp || (data && tokens.length === 0)) {
+      const timer = setTimeout(() => {
+        refetch();
+      }, 5000); // Retry after 5 seconds
+      return () => clearTimeout(timer);
+    }
+  }, [isWarmingUp, data, tokens.length, refetch]);
 
   // Handle query errors
   useEffect(() => {
@@ -76,6 +92,15 @@ const TokenExplorer = () => {
 
   return (
     <div className="px-4 lg:px-8 xl:px-12 py-0 w-full">
+      {/* Stale/Warming indicator */}
+      {(isStale || isWarmingUp) && (
+        <div className="mb-4 px-3 py-2 bg-yellow-50 border border-yellow-200 text-yellow-800 text-xs rounded-md flex items-center gap-2">
+          <span className="inline-block w-2 h-2 bg-yellow-400 rounded-full animate-pulse" />
+          {isWarmingUp
+            ? "Loading tokens for the first time... Refresh in a moment."
+            : "Refreshing tokens in the background..."}
+        </div>
+      )}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4 lg:gap-8 xl:gap-16 w-full">
         {tokens.slice(0, displayedTokens).map((token) => (
           <div

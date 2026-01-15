@@ -65,17 +65,35 @@ export default async function handler(request: Request, context: Context) {
       return jsonResponse(blobData.data.tokens, "STALE_REFRESH", blobAge);
     }
 
-    // Step 5: No cache at all - must fetch synchronously (only happens on first deploy)
-    console.log("[tokens] No cache found, doing full fetch...");
-    const startTime = Date.now();
-    const freshData = await fetchTokensIncremental(undefined); // Full fetch when no existing data
-    console.log(`[tokens] Full fetch: ${freshData.tokens.length} tokens in ${Date.now() - startTime}ms`);
+    // Step 5: No cache at all - fetch in background, return empty immediately
+    // This prevents timeout on first deploy
+    console.log("[tokens] No cache found, starting background fetch...");
+    context.waitUntil(
+      (async () => {
+        try {
+          const startTime = Date.now();
+          const freshData = await fetchTokensIncremental(undefined);
+          console.log(`[tokens] Background full fetch: ${freshData.tokens.length} tokens in ${Date.now() - startTime}ms`);
+          const newStored: StoredData = { data: freshData, timestamp: Date.now() };
+          memoryCache = newStored;
+          await store.setJSON(CACHE_KEY, newStored);
+        } catch (error) {
+          console.error("[tokens] Background full fetch failed:", error);
+        }
+      })()
+    );
 
-    const newStored: StoredData = { data: freshData, timestamp: now };
-    memoryCache = newStored;
-    await store.setJSON(CACHE_KEY, newStored);
-
-    return jsonResponse(freshData.tokens, "MISS", 0);
+    // Return empty array with header indicating cache is warming up
+    return new Response(JSON.stringify([]), {
+      status: 200,
+      headers: {
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*",
+        "Cache-Control": "no-cache",
+        "X-Cache-Status": "WARMING_UP",
+        "X-Token-Count": "0",
+      },
+    });
 
   } catch (error) {
     console.error("[tokens] Error:", error);

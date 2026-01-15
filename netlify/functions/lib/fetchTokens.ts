@@ -266,25 +266,43 @@ async function fetchTokenData(
 ): Promise<TokenDataAPI[]> {
   if (tokenMeta.length === 0) return [];
 
-  // Build multicall for get(), uri(), and mintOpenUntil() for each token
-  const allCalls = tokenMeta.flatMap((meta) => [
-    { address: meta.contractAddress, abi: tokenAbi, functionName: "get" as const, args: [BigInt(meta.tokenId)] as const },
-    { address: meta.contractAddress, abi: tokenAbi, functionName: "uri" as const, args: [BigInt(meta.tokenId)] as const },
-    { address: meta.contractAddress, abi: tokenAbi, functionName: "mintOpenUntil" as const, args: [BigInt(meta.tokenId)] as const },
-  ]);
+  // Fetch token data using concurrent individual calls (avoids Multicall3 gas limits)
+  const CONCURRENCY = 50;
+  const allResults: { get: unknown; uri: unknown; mintOpenUntil: unknown }[] = [];
 
-  // Batch all calls using multicall (in chunks)
-  const CHUNK_SIZE = 150;
-  const allResults: { status: "success" | "failure"; result?: unknown }[] = [];
-
-  for (let i = 0; i < allCalls.length; i += CHUNK_SIZE) {
-    const chunk = allCalls.slice(i, i + CHUNK_SIZE);
-    const results = await client.multicall({
-      contracts: chunk,
-      allowFailure: true,
-    });
+  for (let i = 0; i < tokenMeta.length; i += CONCURRENCY) {
+    const batch = tokenMeta.slice(i, i + CONCURRENCY);
+    const batchResults = await Promise.all(
+      batch.map(async (meta) => {
+        try {
+          const [getResult, uriResult, mintOpenUntilResult] = await Promise.all([
+            client.readContract({
+              address: meta.contractAddress,
+              abi: tokenAbi,
+              functionName: "get",
+              args: [BigInt(meta.tokenId)],
+            }).catch(() => null),
+            client.readContract({
+              address: meta.contractAddress,
+              abi: tokenAbi,
+              functionName: "uri",
+              args: [BigInt(meta.tokenId)],
+            }).catch(() => null),
+            client.readContract({
+              address: meta.contractAddress,
+              abi: tokenAbi,
+              functionName: "mintOpenUntil",
+              args: [BigInt(meta.tokenId)],
+            }).catch(() => null),
+          ]);
+          return { get: getResult, uri: uriResult, mintOpenUntil: mintOpenUntilResult };
+        } catch {
+          return { get: null, uri: null, mintOpenUntil: null };
+        }
+      })
+    );
     rpcStats.calls.multicall++;
-    allResults.push(...results);
+    allResults.push(...batchResults);
   }
 
   // Get unique contracts for mint events
@@ -324,18 +342,23 @@ async function fetchTokenData(
 
   // Parse results
   const tokens: TokenDataAPI[] = [];
+  let skippedInFetch = 0;
 
   for (let i = 0; i < tokenMeta.length; i++) {
     const meta = tokenMeta[i];
-    const getResult = allResults[i * 3];
-    const uriResult = allResults[i * 3 + 1];
-    const mintOpenUntilResult = allResults[i * 3 + 2];
+    const result = allResults[i];
 
-    if (getResult.status !== "success") continue;
+    if (!result.get) {
+      skippedInFetch++;
+      if (skippedInFetch <= 5) {
+        console.log(`[Tokens] fetchTokenData: Skipped ${meta.contractAddress} token ${meta.tokenId} - get() returned null`);
+      }
+      continue;
+    }
 
-    const details = getResult.result as [string, string, Address[], number, number, bigint, bigint];
-    const uri = uriResult.status === "success" ? (uriResult.result as string) : undefined;
-    const mintOpenUntil = mintOpenUntilResult.status === "success" ? Number(mintOpenUntilResult.result) : 0;
+    const details = result.get as [string, string, Address[], number, number, bigint, bigint];
+    const uri = result.uri as string | undefined;
+    const mintOpenUntil = result.mintOpenUntil ? Number(result.mintOpenUntil) : 0;
     const mintKey = `${meta.contractAddress.toLowerCase()}-${meta.tokenId}`;
     const totalMinted = mintCountMap.get(mintKey) || 0;
 
@@ -351,6 +374,10 @@ async function fetchTokenData(
       totalMinted,
       uri,
     });
+  }
+
+  if (skippedInFetch > 0) {
+    console.log(`[Tokens] fetchTokenData: ${tokens.length} succeeded, ${skippedInFetch} failed get()`);
   }
 
   return tokens;
@@ -421,26 +448,48 @@ async function fetchAllTokensFull(): Promise<TokenDataAPI[]> {
 
   console.log(`[Tokens] Fetching ${tokenMeta.length} tokens across ${contracts.length} contracts`);
 
-  // Step 3: Build multicall for get(), uri(), and mintOpenUntil() for each token
-  const allCalls = tokenMeta.flatMap((meta) => [
-    { address: meta.contractAddress, abi: tokenAbi, functionName: "get" as const, args: [BigInt(meta.tokenId)] as const },
-    { address: meta.contractAddress, abi: tokenAbi, functionName: "uri" as const, args: [BigInt(meta.tokenId)] as const },
-    { address: meta.contractAddress, abi: tokenAbi, functionName: "mintOpenUntil" as const, args: [BigInt(meta.tokenId)] as const },
-  ]);
+  // Step 3: Fetch token data using concurrent individual calls
+  // Using Promise.all with individual readContract calls instead of multicall
+  // This avoids Multicall3 gas limit issues while still being efficient
+  const CONCURRENCY = 50; // Process 50 tokens at a time
+  const allResults: { get: unknown; uri: unknown; mintOpenUntil: unknown }[] = [];
 
-  // Step 4: Batch all calls using multicall (in chunks)
-  const CHUNK_SIZE = 150; // 3 calls per token, so 50 tokens per chunk
-  const allResults: { status: "success" | "failure"; result?: unknown }[] = [];
-
-  for (let i = 0; i < allCalls.length; i += CHUNK_SIZE) {
-    const chunk = allCalls.slice(i, i + CHUNK_SIZE);
-    const results = await client.multicall({
-      contracts: chunk,
-      allowFailure: true,
-    });
-    rpcStats.calls.multicall++;
-    allResults.push(...results);
+  for (let i = 0; i < tokenMeta.length; i += CONCURRENCY) {
+    const batch = tokenMeta.slice(i, i + CONCURRENCY);
+    const batchResults = await Promise.all(
+      batch.map(async (meta) => {
+        try {
+          const [getResult, uriResult, mintOpenUntilResult] = await Promise.all([
+            client.readContract({
+              address: meta.contractAddress,
+              abi: tokenAbi,
+              functionName: "get",
+              args: [BigInt(meta.tokenId)],
+            }).catch(() => null),
+            client.readContract({
+              address: meta.contractAddress,
+              abi: tokenAbi,
+              functionName: "uri",
+              args: [BigInt(meta.tokenId)],
+            }).catch(() => null),
+            client.readContract({
+              address: meta.contractAddress,
+              abi: tokenAbi,
+              functionName: "mintOpenUntil",
+              args: [BigInt(meta.tokenId)],
+            }).catch(() => null),
+          ]);
+          return { get: getResult, uri: uriResult, mintOpenUntil: mintOpenUntilResult };
+        } catch {
+          return { get: null, uri: null, mintOpenUntil: null };
+        }
+      })
+    );
+    rpcStats.calls.multicall++; // Count as batch operation
+    allResults.push(...batchResults);
   }
+
+  console.log(`[Tokens] Fetched data for ${allResults.length} tokens`);
 
   // Step 5: Get NewMint events for all contracts to calculate totalMinted
   // Parallelize with concurrency limit
@@ -479,18 +528,23 @@ async function fetchAllTokensFull(): Promise<TokenDataAPI[]> {
 
   // Step 6: Parse results
   const tokens: TokenDataAPI[] = [];
+  let skippedCount = 0;
 
   for (let i = 0; i < tokenMeta.length; i++) {
     const meta = tokenMeta[i];
-    const getResult = allResults[i * 3];
-    const uriResult = allResults[i * 3 + 1];
-    const mintOpenUntilResult = allResults[i * 3 + 2];
+    const result = allResults[i];
 
-    if (getResult.status !== "success") continue;
+    if (!result.get) {
+      skippedCount++;
+      if (skippedCount <= 10) {
+        console.log(`[Tokens] Skipped ${meta.contractAddress} token ${meta.tokenId}: get() returned null`);
+      }
+      continue;
+    }
 
-    const details = getResult.result as [string, string, Address[], number, number, bigint, bigint];
-    const uri = uriResult.status === "success" ? (uriResult.result as string) : undefined;
-    const mintOpenUntil = mintOpenUntilResult.status === "success" ? Number(mintOpenUntilResult.result) : 0;
+    const details = result.get as [string, string, Address[], number, number, bigint, bigint];
+    const uri = result.uri as string | undefined;
+    const mintOpenUntil = result.mintOpenUntil ? Number(result.mintOpenUntil) : 0;
     const mintKey = `${meta.contractAddress.toLowerCase()}-${meta.tokenId}`;
     const totalMinted = mintCountMap.get(mintKey) || 0;
 
@@ -515,7 +569,7 @@ async function fetchAllTokensFull(): Promise<TokenDataAPI[]> {
   // Note: Metadata (images) fetched client-side to avoid slow IPFS/external requests
 
   rpcStats.log();
-  console.log(`[Tokens] Returning ${tokens.length} tokens`);
+  console.log(`[Tokens] Returning ${tokens.length} tokens (skipped ${skippedCount} failed get() calls)`);
 
   return tokens;
 }

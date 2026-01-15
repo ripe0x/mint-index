@@ -94,15 +94,28 @@ interface TokenDataAPI {
   metadata?: TokenMetadata;
 }
 
-export async function fetchTokensFromAPI(): Promise<TokenInfo[]> {
+export interface TokensResponse {
+  tokens: TokenInfo[];
+  cacheStatus: string;
+  cacheAgeSeconds: number;
+  isStale: boolean;
+  isWarmingUp: boolean;
+}
+
+export async function fetchTokensFromAPI(): Promise<TokensResponse> {
   const response = await fetch("/api/tokens");
 
   if (!response.ok) {
     throw new Error(`Failed to fetch tokens: ${response.status}`);
   }
 
+  const cacheStatus = response.headers.get("X-Cache-Status") || "UNKNOWN";
+  const cacheAgeSeconds = parseInt(response.headers.get("X-Cache-Age") || "0", 10);
+  const isStale = cacheStatus === "STALE_REFRESH" || cacheAgeSeconds > 300;
+  const isWarmingUp = cacheStatus === "WARMING_UP";
+
   const data: TokenDataAPI[] = await response.json();
-  return data.map((item) => ({
+  const tokens = data.map((item) => ({
     contractAddress: item.contractAddress as Address,
     deployerAddress: item.deployerAddress as Address,
     tokenId: item.tokenId,
@@ -115,6 +128,8 @@ export async function fetchTokensFromAPI(): Promise<TokenInfo[]> {
     uri: item.uri,
     metadata: item.metadata,
   }));
+
+  return { tokens, cacheStatus, cacheAgeSeconds, isStale, isWarmingUp };
 }
 
 // Token detail types and API
