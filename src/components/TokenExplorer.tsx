@@ -27,15 +27,16 @@ const TokenExplorer = () => {
   const isStale = data?.isStale || false;
   const isWarmingUp = data?.isWarmingUp || false;
 
-  // Auto-refetch when warming up (first deploy) or when data is empty
+  // Auto-refetch when stale, warming up, or data is empty
   useEffect(() => {
-    if (isWarmingUp || (data && tokens.length === 0)) {
+    if (isStale || isWarmingUp || (data && tokens.length === 0)) {
+      const delay = isWarmingUp ? 5000 : 10000; // 5s for warming, 10s for stale
       const timer = setTimeout(() => {
         refetch();
-      }, 5000); // Retry after 5 seconds
+      }, delay);
       return () => clearTimeout(timer);
     }
-  }, [isWarmingUp, data, tokens.length, refetch]);
+  }, [isStale, isWarmingUp, data, tokens.length, refetch]);
 
   // Handle query errors
   useEffect(() => {

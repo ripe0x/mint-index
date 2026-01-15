@@ -111,7 +111,8 @@ export async function fetchTokensFromAPI(): Promise<TokensResponse> {
 
   const cacheStatus = response.headers.get("X-Cache-Status") || "UNKNOWN";
   const cacheAgeSeconds = parseInt(response.headers.get("X-Cache-Age") || "0", 10);
-  const isStale = cacheStatus === "STALE_REFRESH" || cacheAgeSeconds > 300;
+  // Only show stale banner when server explicitly says it's refreshing
+  const isStale = cacheStatus === "STALE_REFRESH";
   const isWarmingUp = cacheStatus === "WARMING_UP";
 
   const data: TokenDataAPI[] = await response.json();

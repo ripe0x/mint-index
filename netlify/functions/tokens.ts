@@ -153,6 +153,7 @@ function jsonResponse(tokens: TokenDataAPI[], cacheStatus: string, ageMs: number
     headers: {
       "Content-Type": "application/json",
       "Access-Control-Allow-Origin": "*",
+      "Access-Control-Expose-Headers": "X-Cache-Age, X-Cache-Status, X-Token-Count",
       "Cache-Control": `public, max-age=${Math.floor(CACHE_TTL_MS / 1000)}, s-maxage=${Math.floor(CACHE_TTL_MS / 1000)}`,
       "X-Cache-Age": `${Math.round(ageMs / 1000)}`,
       "X-Cache-Status": cacheStatus,
